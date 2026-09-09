@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎉 나만의 캐릭터 퍼레이드</title>
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #ff9a56 0%, #ff6b95 50%, #7b68ee 100%);
+        min-height: 100vh;
+        color: white;
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+    }
+    .container { max-width: 1100px; width: 100%; }
+    h1 {
+        text-align: center;
+        font-size: 2.3em;
+        margin-bottom: 5px;
+        text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+    }
+    .subtitle { text-align: center; opacity: 0.9; margin-bottom: 25px; }
+
+    .panels { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 25px; }
+    .draw-panel, .lineup-panel {
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(8px);
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .draw-panel { flex: 1 1 380px; }
+    .lineup-panel { flex: 1 1 300px; }
+
+    h2 { font-size: 1.3em; margin-bottom: 12px; }
+
+    #drawCanvas {
+        background: white;
+        border-radius: 14px;
+        cursor: crosshair;
+        touch-action: none;
+        display: block;
+        margin: 0 auto 12px auto;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    .tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-bottom: 12px; }
+    .tools label { font-size: 0.85em; }
+    input[type=color] { width: 36px; height: 36px; border: none; border-radius: 8px; cursor: pointer; }
+    input[type=range] { cursor: pointer; }
+
+    button {
+        border: none;
+        padding: 10px 20px;
+        border-radius: 30px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 0.95em;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        transition: transform 0.15s;
+    }
+    button:hover { transform: translateY(-2px); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    #clearBtn { background: #eee; color: #333; }
+    #eraseBtn { background: #ffb74d; color: #333; }
+    #addToParadeBtn { background: linear-gradient(45deg, #4CAF50, #2e7d32); color: white; }
+
+    #lineupList { list-style: none; display: flex; flex-direction: column; gap: 10px; max-height: 260px; overflow-y: auto; }
+    #lineupList li {
+        display: flex; align-items: center; gap: 10px;
+        background: rgba(0,0,0,0.2);
+        padding: 8px 10px;
+        border-radius: 10px;
+    }
+    #lineupList img { width: 44px; height: 44px; object-fit: contain; background: white; border-radius: 6px; }
+    #lineupList span { flex: 1; font-size: 0.9em; }
+    #lineupList button { padding: 4px 10px; font-size: 0.8em; background: #e57373; color: white; }
+
+    .preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; justify-content: center; }
+    .preset-row button { background: rgba(255,255,255,0.25); color: white; font-size: 1.4em; padding: 6px 10px; }
+
+    .stage-controls { display: flex; gap: 12px; justify-content: center; margin-bottom: 15px; flex-wrap: wrap; }
+    #startParadeBtn { background: linear-gradient(45deg, #ffd700, #ff9800); color: #333; font-size: 1.1em; padding: 14px 30px; }
+    #stopParadeBtn { background: linear-gradient(45deg, #e53935, #b71c1c); color: white; font-size: 1.1em; padding: 14px 30px; }
+
+    #stage {
+        position: relative;
+        width: 100%;
+        height: 260px;
+        background: linear-gradient(to bottom, #87ceeb 0%, #87ceeb 65%, #6b8e23 65%, #556b2f 100%);
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        border: 3px solid rgba(255,255,255,0.3);
+    }
+    .cloud {
+        position: absolute;
+        top: 20px;
+        width: 70px; height: 30px;
+        background: rgba(255,255,255,0.8);
+        border-radius: 50px;
+        filter: blur(1px);
+    }
+    .marcher {
+        position: absolute;
+        bottom: 20px;
+        width: 60px; height: 60px;
+        object-fit: contain;
+        will-change: transform;
+    }
+    .marcher.emoji { font-size: 48px; display:flex; align-items:flex-end; justify-content:center; bottom: 15px; }
+
+    .confetti {
+        position: absolute;
+        top: -10px;
+        width: 8px; height: 8px;
+        opacity: 0.9;
+        border-radius: 2px;
+    }
+
+    .empty-msg { text-align: center; opacity: 0.7; padding: 20px; font-size: 0.95em; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>🎉 나만의 캐릭터 퍼레이드</h1>
+    <p class="subtitle">캐릭터를 그려서 퍼레이드에 참가시켜보세요!</p>
+
+    <div class="panels">
+        <div class="draw-panel">
+            <h2>✏️ 캐릭터 그리기</h2>
+            <canvas id="drawCanvas" width="320" height="320"></canvas>
+            <div class="tools">
+                <label>색상 <input type="color" id="colorPicker" value="#222222"></label>
+                <label>굵기 <input type="range" id="sizeRange" min="2" max="20" value="6"></label>
+                <button id="eraseBtn">🧹 지우개</button>
+                <button id="clearBtn">🗑️ 전체지우기</button>
+            </div>
+            <div style="text-align:center;">
+                <button id="addToParadeBtn">🎺 퍼레이드에 추가하기</button>
+            </div>
+        </div>
+
+        <div class="lineup-panel">
+            <h2>🚩 참가 캐릭터 (<span id="lineupCount">0</span>)</h2>
+            <ul id="lineupList"></ul>
+            <div id="emptyMsg" class="empty-msg">아직 참가한 캐릭터가 없어요.<br>왼쪽에서 그림을 그려 추가해보세요!</div>
+            <h2 style="margin-top:16px; font-size:1.05em;">✨ 기본 캐릭터 추가</h2>
+            <div class="preset-row">
+                <button data-emoji="🐰">🐰</button>
+                <button data-emoji="🐻">🐻</button>
+                <button data-emoji="🦆">🦆</button>
+                <button data-emoji="🐒">🐒</button>
+                <button data-emoji="🦩">🦩</button>
+                <button data-emoji="🥁">🥁</button>
+                <button data-emoji="🎺">🎺</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="stage-controls">
+        <button id="startParadeBtn">🎬 퍼레이드 시작!</button>
+        <button id="stopParadeBtn" disabled>⏹️ 정지</button>
+    </div>
+
+    <div id="stage"></div>
+</div>
+
+<script>
+const canvas = document.getElementById('drawCanvas');
+const ctx = canvas.getContext('2d');
+ctx.fillStyle = 'white';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+ctx.lineCap = 'round';
+ctx.lineJoin = 'round';
+
+let drawing = false;
+let color = document.getElementById('colorPicker').value;
+let size = document.getElementById('sizeRange').value;
+let erasing = false;
+
+function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+}
+
+function startDraw(e) {
+    drawing = true;
+    const p = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    e.preventDefault();
+}
+function draw(e) {
+    if (!drawing) return;
+    const p = getPos(e);
+    ctx.strokeStyle = erasing ? 'white' : color;
+    ctx.lineWidth = erasing ? size * 2 : size;
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    e.preventDefault();
+}
+function endDraw() { drawing = false; }
+
+canvas.addEventListener('mousedown', startDraw);
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('mouseup', endDraw);
+canvas.addEventListener('mouseleave', endDraw);
+canvas.addEventListener('touchstart', startDraw);
+canvas.addEventListener('touchmove', draw);
+canvas.addEventListener('touchend', endDraw);
+
+document.getElementById('colorPicker').addEventListener('input', e => { color = e.target.value; erasing = false; });
+document.getElementById('sizeRange').addEventListener('input', e => { size = e.target.value; });
+document.getElementById('eraseBtn').addEventListener('click', () => { erasing = !erasing; document.getElementById('eraseBtn').style.outline = erasing ? '3px solid #fff' : 'none'; });
+document.getElementById('clearBtn').addEventListener('click', () => {
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+});
+
+// ===== 참가 캐릭터 목록 =====
+let lineup = []; // { type: 'image'|'emoji', src or emoji }
+const lineupList = document.getElementById('lineupList');
+const lineupCount = document.getElementById('lineupCount');
+const emptyMsg = document.getElementById('emptyMsg');
+
+function refreshLineupUI() {
+    lineupList.innerHTML = '';
+    emptyMsg.style.display = lineup.length === 0 ? 'block' : 'none';
+    lineupCount.textContent = lineup.length;
+    lineup.forEach((item, idx) => {
+        const li = document.createElement('li');
+        if (item.type === 'image') {
+            const img = document.createElement('img');
+            img.src = item.src;
+            li.appendChild(img);
+        } else {
+            const span = document.createElement('span');
+            span.style.fontSize = '2em';
+            span.textContent = item.emoji;
+            span.style.flex = '0 0 44px';
+            li.appendChild(span);
+        }
+        const label = document.createElement('span');
+        label.textContent = item.type === 'image' ? `내 캐릭터 #${idx + 1}` : item.emoji + ' 캐릭터';
+        li.appendChild(label);
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = '삭제';
+        removeBtn.addEventListener('click', () => {
+            lineup.splice(idx, 1);
+            refreshLineupUI();
+        });
+        li.appendChild(removeBtn);
+        lineupList.appendChild(li);
+    });
+}
+
+function trimCanvasToDataUrl() {
+    // 그려진 영역만 자동으로 잘라내기 (흰 배경 제외한 바운딩박스)
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const { data, width, height } = imgData;
+    let minX = width, minY = height, maxX = 0, maxY = 0;
+    let found = false;
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            const r = data[i], g = data[i+1], b = data[i+2];
+            if (!(r > 245 && g > 245 && b > 245)) {
+                found = true;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+    if (!found) return null;
+
+    const pad = 8;
+    minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+    maxX = Math.min(width, maxX + pad); maxY = Math.min(height, maxY + pad);
+    const w = maxX - minX, h = maxY - minY;
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = w; tempCanvas.height = h;
+    const tctx = tempCanvas.getContext('2d');
+    tctx.drawImage(canvas, minX, minY, w, h, 0, 0, w, h);
+
+    // 흰 배경을 투명하게
+    const tImgData = tctx.getImageData(0, 0, w, h);
+    const td = tImgData.data;
+    for (let i = 0; i < td.length; i += 4) {
+        if (td[i] > 245 && td[i+1] > 245 && td[i+2] > 245) td[i+3] = 0;
+    }
+    tctx.putImageData(tImgData, 0, 0);
+
+    return tempCanvas.toDataURL();
+}
+
+document.getElementById('addToParadeBtn').addEventListener('click', () => {
+    const dataUrl = trimCanvasToDataUrl();
+    if (!dataUrl) {
+        alert('캔버스에 먼저 캐릭터를 그려주세요!');
+        return;
+    }
+    lineup.push({ type: 'image', src: dataUrl });
+    refreshLineupUI();
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+});
+
+document.querySelectorAll('.preset-row button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        lineup.push({ type: 'emoji', emoji: btn.dataset.emoji });
+        refreshLineupUI();
+    });
+});
+
+// ===== 퍼레이드 스테이지 =====
+const stage = document.getElementById('stage');
+let paradeRunning = false;
+let paradeIntervalId = null;
+let confettiIntervalId = null;
+let marchLoop = null;
+let synth, drumHit, bassSynth;
+
+function addClouds() {
+    for (let i = 0; i < 3; i++) {
+        const c = document.createElement('div');
+        c.className = 'cloud';
+        c.style.left = (i * 35 + Math.random() * 10) + '%';
+        c.style.top = (10 + Math.random() * 20) + 'px';
+        stage.appendChild(c);
+    }
+}
+
+function spawnMarcher(item, delaySec) {
+    let el;
+    if (item.type === 'image') {
+        el = document.createElement('img');
+        el.className = 'marcher';
+        el.src = item.src;
+    } else {
+        el = document.createElement('div');
+        el.className = 'marcher emoji';
+        el.textContent = item.emoji;
+    }
+    el.style.left = '-80px';
+    stage.appendChild(el);
+
+    const stageWidth = stage.clientWidth;
+    const duration = 6 + Math.random() * 2; // 초
+    let start = null;
+    let bobPhase = Math.random() * Math.PI;
+
+    function frame(ts) {
+        if (!start) start = ts;
+        const elapsed = (ts - start) / 1000;
+        const progress = elapsed / duration;
+        if (progress >= 1) {
+            el.remove();
+            return;
+        }
+        const x = -80 + progress * (stageWidth + 160);
+        const bob = Math.sin(elapsed * 8 + bobPhase) * 6;
+        el.style.transform = `translate(${x}px, ${bob}px)`;
+        requestAnimationFrame(frame);
+    }
+    setTimeout(() => requestAnimationFrame(frame), delaySec * 1000);
+}
+
+function spawnConfetti() {
+    const colors = ['#ffd700', '#ff6b95', '#4CAF50', '#42a5f5', '#ffa726'];
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = Math.random() * 100 + '%';
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    stage.appendChild(c);
+
+    let y = -10;
+    const speed = 1.5 + Math.random() * 2;
+    const sway = Math.random() * 2 - 1;
+    function fall() {
+        y += speed;
+        c.style.top = y + 'px';
+        c.style.left = (parseFloat(c.style.left) + sway * 0.1) + '%';
+        if (y > 260) { c.remove(); return; }
+        requestAnimationFrame(fall);
+    }
+    requestAnimationFrame(fall);
+}
+
+function setupMarchAudio() {
+    if (synth) synth.dispose();
+    if (bassSynth) bassSynth.dispose();
+    // 밝고 신나는 금관 팡파르 느낌의 멜로디 악기
+    synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.01, decay: 0.15, sustain: 0.35, release: 0.25 }
+    }).toDestination();
+    synth.volume.value = -4;
+
+    bassSynth = new Tone.Synth({
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.15 }
+    }).toDestination();
+    bassSynth.volume.value = -6;
+
+    drumHit = {
+        kick: new Tone.MembraneSynth({ octaves: 4, envelope: { attack: 0.001, decay: 0.3, sustain: 0 } }).toDestination(),
+        snare: new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.12, sustain: 0 } }).toDestination(),
+        cymbal: new Tone.MetalSynth({ envelope: { attack: 0.001, decay: 0.6, release: 0.2 }, harmonicity: 5.1, resonance: 3000, octaves: 1.2 }).toDestination()
+    };
+    drumHit.kick.volume.value = -4;
+    drumHit.snare.volume.value = -8;
+    drumHit.cymbal.volume.value = -14;
+}
+
+// 신나는 팡파르풍 멜로디 패턴 (2/4박자, 8분음표 단위, 4마디 주기로 반복+변주)
+const melodyPattern = [
+    "C5","E5","G5","C6","G5","E5","C5","G4",
+    "C5","D5","E5","G5","E5","D5","C5","B4",
+    "C5","E5","G5","C6","G5","E5","C5","G4",
+    "G5","F5","E5","D5","C5","D5","E5","C5"
+];
+const bassPattern = ["C3","G3","C3","G3","C3","G3","C3","G3"];
+
+let marchLoop2, bassLoop, accentLoop;
+
+function startMarchAudio() {
+    let step = 0;
+    let bar = 0;
+    Tone.Transport.bpm.value = 132;
+
+    marchLoop = new Tone.Loop((time) => {
+        const note = melodyPattern[step % melodyPattern.length];
+        synth.triggerAttackRelease(note, '16n', time);
+        step++;
+    }, '8n').start(0);
+
+    bassLoop = new Tone.Loop((time) => {
+        bassSynth.triggerAttackRelease(bassPattern[bar % bassPattern.length], '8n', time);
+        if (bar % 2 === 0) drumHit.kick.triggerAttackRelease('C1', '8n', time);
+        else drumHit.snare.triggerAttackRelease('16n', time);
+        bar++;
+    }, '4n').start(0);
+
+    // 4마디마다 심벌 크래시로 신나는 포인트
+    let accentCount = 0;
+    accentLoop = new Tone.Loop((time) => {
+        drumHit.cymbal.triggerAttackRelease('8n', time);
+        accentCount++;
+    }, '2m').start(0);
+
+    Tone.Transport.start();
+}
+
+document.getElementById('startParadeBtn').addEventListener('click', async () => {
+    if (lineup.length === 0) {
+        alert('먼저 캐릭터를 퍼레이드에 추가해주세요!');
+        return;
+    }
+    if (paradeRunning) return;
+    paradeRunning = true;
+    document.getElementById('startParadeBtn').disabled = true;
+    document.getElementById('stopParadeBtn').disabled = false;
+
+    await Tone.start();
+    setupMarchAudio();
+    startMarchAudio();
+
+    stage.innerHTML = '';
+    addClouds();
+
+    let i = 0;
+    paradeIntervalId = setInterval(() => {
+        const item = lineup[i % lineup.length];
+        spawnMarcher(item, 0);
+        i++;
+    }, 900);
+
+    confettiIntervalId = setInterval(spawnConfetti, 300);
+});
+
+document.getElementById('stopParadeBtn').addEventListener('click', () => {
+    paradeRunning = false;
+    clearInterval(paradeIntervalId);
+    clearInterval(confettiIntervalId);
+    [marchLoop, bassLoop, accentLoop].forEach(l => { if (l) { l.stop(); l.dispose(); } });
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
+    document.getElementById('startParadeBtn').disabled = false;
+    document.getElementById('stopParadeBtn').disabled = true;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Firebase CLI 가 남기는 기록
+firebase-debug.log
+firestore-debug.log
+.firebase/
+
+# 편집기·도구 설정
+.claude/
+node_modules/

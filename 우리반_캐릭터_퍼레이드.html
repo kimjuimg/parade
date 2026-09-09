@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🎉 우리 반 캐릭터 퍼레이드</title>
+
+<!-- 행진곡을 연주하는 소리 라이브러리 -->
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+<!-- 역할 선택 화면에 띄우는 QR코드 -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; }
+body {
+  font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif;
+  background:linear-gradient(135deg,#ff9a56 0%,#ff6b95 50%,#7b68ee 100%);
+  color:#fff;
+  overflow:hidden;
+}
+button { border:none; font-family:inherit; font-weight:700; cursor:pointer; transition:transform .12s, filter .12s; }
+button:hover:not(:disabled) { transform:translateY(-2px); filter:brightness(1.06); }
+button:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+[hidden] { display:none !important; }
+
+/* ===================== 역할 선택 화면 ===================== */
+#roleScreen {
+  height:100%; overflow-y:auto;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:24px 20px; text-align:center;
+}
+#roleScreen h1 { font-size:clamp(1.7em,5vw,2.7em); text-shadow:2px 2px 10px rgba(0,0,0,.3); }
+#roleScreen .sub { opacity:.92; margin:6px 0 22px; font-size:clamp(.88em,2.4vw,1.05em); }
+.role-cards { display:flex; gap:18px; flex-wrap:wrap; justify-content:center; }
+.role-card {
+  background:rgba(255,255,255,.16); backdrop-filter:blur(8px);
+  border:2px solid rgba(255,255,255,.3); border-radius:22px;
+  padding:24px 28px; width:230px; color:#fff; font-size:1.15em;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+}
+.role-card .ico { font-size:2.5em; display:block; margin-bottom:6px; }
+.role-card .desc { display:block; font-size:.7em; font-weight:400; opacity:.85; margin-top:8px; line-height:1.5; }
+
+.share-box {
+  margin-top:26px; background:rgba(0,0,0,.22); border-radius:18px;
+  padding:14px 16px; max-width:520px; width:100%;
+  display:flex; gap:14px; align-items:center; text-align:left;
+}
+#qr { border-radius:10px; background:#fff; padding:5px; flex:0 0 auto; line-height:0; }
+#qr img, #qr canvas { display:block; width:120px; height:120px; }
+.share-box .txt { flex:1; min-width:0; font-size:.84em; }
+.share-box .txt b { display:block; margin-bottom:6px; font-size:1.08em; }
+#shareUrl {
+  display:block; word-break:break-all; opacity:.9;
+  background:rgba(0,0,0,.25); border-radius:8px; padding:6px 8px; margin-bottom:8px;
+}
+#copyBtn { background:#fff; color:#333; border-radius:20px; padding:6px 14px; font-size:.95em; }
+
+.warn {
+  margin-top:18px; max-width:520px; width:100%;
+  background:rgba(183,28,28,.55); border:2px solid rgba(255,255,255,.4);
+  border-radius:14px; padding:12px 16px; font-size:.84em; line-height:1.65; text-align:left;
+}
+
+/* ===================== 학생 화면 ===================== */
+#studentScreen { height:100%; overflow-y:auto; padding:14px 14px 30px; }
+.s-wrap { max-width:520px; margin:0 auto; display:flex; flex-direction:column; gap:12px; }
+.s-head { display:flex; align-items:center; gap:10px; }
+.s-head h2 { font-size:1.2em; flex:1; }
+.backBtn { background:rgba(0,0,0,.25); color:#fff; border-radius:18px; padding:7px 13px; font-size:.8em; }
+
+.panel {
+  background:rgba(255,255,255,.15); backdrop-filter:blur(8px);
+  border-radius:18px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,.22);
+}
+.panel h3 { font-size:.92em; margin-bottom:9px; opacity:.95; }
+
+#drawCanvas {
+  background:#fff; border-radius:14px; cursor:crosshair; touch-action:none;
+  display:block; width:100%; max-width:320px; aspect-ratio:1/1; height:auto;
+  margin:0 auto 12px; box-shadow:0 4px 16px rgba(0,0,0,.3);
+}
+
+.preset-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; }
+.preset-grid button {
+  background:rgba(255,255,255,.9); color:#333; border-radius:12px;
+  padding:8px 2px; font-size:.66em; line-height:1.25;
+}
+.preset-grid button .pico { display:block; font-size:1.7em; margin-bottom:2px; }
+
+.swatches { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-bottom:10px; }
+.swatch { height:34px; border-radius:10px; border:3px solid transparent; box-shadow:0 2px 6px rgba(0,0,0,.3); }
+.swatch.on { border-color:#fff; transform:scale(1.09); }
+
+.tool-row { display:flex; align-items:center; gap:9px; flex-wrap:wrap; font-size:.8em; }
+.tool-row input[type=color] { width:38px; height:34px; border:none; border-radius:9px; background:none; cursor:pointer; }
+.tool-row input[type=range] { flex:1; min-width:80px; cursor:pointer; }
+#eraseBtn { background:#ffb74d; color:#333; border-radius:18px; padding:8px 14px; font-size:1em; }
+#eraseBtn.on { outline:3px solid #fff; }
+#clearBtn { background:#eee; color:#333; border-radius:18px; padding:8px 14px; font-size:1em; }
+
+#nameInput {
+  width:100%; padding:11px 14px; border:none; border-radius:14px;
+  font-size:1em; font-family:inherit; color:#333; margin-bottom:10px;
+}
+#sendBtn {
+  width:100%; background:linear-gradient(45deg,#4CAF50,#2e7d32); color:#fff;
+  border-radius:26px; padding:15px; font-size:1.1em; box-shadow:0 6px 18px rgba(0,0,0,.3);
+}
+#sendMsg { text-align:center; margin-top:10px; font-size:.88em; min-height:1.4em; line-height:1.5; }
+
+/* ===================== 선생님 화면 ===================== */
+#teacherScreen { height:100%; display:flex; flex-direction:column; }
+.t-bar {
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  padding:9px 14px; background:rgba(0,0,0,.35); backdrop-filter:blur(6px);
+  flex:0 0 auto; z-index:5;
+}
+.t-bar h2 { font-size:1.02em; margin-right:auto; }
+#countBadge { background:rgba(255,255,255,.2); border-radius:20px; padding:6px 14px; font-size:.86em; font-weight:700; }
+.t-bar button { border-radius:20px; padding:8px 15px; font-size:.84em; }
+#musicBtn { background:#ffd54f; color:#333; }
+#resetBtn { background:#ef5350; color:#fff; }
+#tBackBtn { background:rgba(255,255,255,.25); color:#fff; }
+
+#stage { position:relative; flex:1 1 auto; overflow:hidden; background:linear-gradient(#7fcdff 0%,#c3ebff 55%,#ffe6ad 100%); }
+
+.cloud { position:absolute; top:0; left:0; background:#fff; border-radius:50%; opacity:.85; will-change:transform; pointer-events:none; }
+.cloud::before, .cloud::after { content:''; position:absolute; background:#fff; border-radius:50%; }
+.cloud::before { width:62%; height:118%; left:6%;  top:-52%; }
+.cloud::after  { width:46%; height:96%;  right:8%; top:-34%; }
+
+#ground {
+  position:absolute; left:0; right:0; bottom:0; height:24%;
+  background:#7e57c2; border-top:5px solid rgba(255,255,255,.7); overflow:hidden;
+}
+#stripes {
+  position:absolute; top:0; bottom:0; left:-300px; right:-300px;
+  background:repeating-linear-gradient(90deg,
+    rgba(255,255,255,.85) 0 46px, rgba(255,255,255,0) 46px 132px);
+  will-change:transform;
+}
+#groundGlow { position:absolute; left:0; right:0; top:0; height:45%;
+  background:linear-gradient(rgba(255,255,255,.32),rgba(255,255,255,0)); }
+
+.marcher {
+  position:absolute; bottom:0; left:0;
+  display:flex; flex-direction:column; align-items:center; gap:5px;
+  will-change:transform; pointer-events:none;
+}
+.marcher img {
+  height:clamp(84px,17vh,190px); width:auto; max-width:230px; object-fit:contain;
+  filter:drop-shadow(3px 6px 6px rgba(0,0,0,.35));
+}
+.marcher .tag {
+  background:rgba(0,0,0,.55); color:#fff; border-radius:16px; padding:3px 12px;
+  font-size:clamp(.7em,1.5vh,.95em); font-weight:700;
+  white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis;
+}
+
+.confetti { position:absolute; top:0; left:0; width:9px; height:14px; border-radius:2px; will-change:transform; pointer-events:none; }
+
+#stageMsg {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  text-align:center; font-size:clamp(1em,2.3vw,1.45em); line-height:1.8;
+  text-shadow:2px 2px 8px rgba(0,0,0,.45); padding:20px; pointer-events:none;
+}
+
+/* ===================== 오류 안내 ===================== */
+#bootError { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.86);
+  display:flex; align-items:center; justify-content:center; padding:26px; }
+#bootError .box { max-width:520px; background:#fff; color:#333; border-radius:18px;
+  padding:22px 26px; line-height:1.75; font-size:.94em; }
+#bootError h3 { color:#c62828; margin-bottom:10px; }
+#bootError button { margin-top:14px; background:#333; color:#fff; border-radius:20px; padding:8px 18px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== 역할 선택 ===================== -->
+<div id="roleScreen">
+  <h1>🎉 우리 반 캐릭터 퍼레이드</h1>
+  <p class="sub">내가 그린 캐릭터가 교실 큰 화면에서 행진해요!</p>
+
+  <div class="role-cards">
+    <button class="role-card" id="goStudent">
+      <span class="ico">🎨</span>
+      학생이에요
+      <span class="desc">캐릭터를 그려서<br>퍼레이드로 보내요</span>
+    </button>
+    <button class="role-card" id="goTeacher">
+      <span class="ico">🎬</span>
+      선생님이에요
+      <span class="desc">전자칠판에 띄우는<br>퍼레이드 무대예요</span>
+    </button>
+  </div>
+
+  <div class="share-box" id="shareBox">
+    <div id="qr"></div>
+    <div class="txt">
+      <b>학생들에게 알려줄 주소</b>
+      <code id="shareUrl"></code>
+      <button id="copyBtn">주소 복사</button>
+    </div>
+  </div>
+
+  <div class="warn" id="fileWarn" hidden>
+    ⚠️ 지금 이 파일을 <b>컴퓨터에서 바로 열었습니다(file://).</b>
+    이 상태에서는 기기끼리 데이터가 오가지 않아 학생이 보낸 캐릭터가 선생님 화면에 나타나지 않습니다.
+    인터넷에 올린 <b>같은 주소(http/https)</b>로 접속해 주세요.
+  </div>
+</div>
+
+<!-- ===================== 학생 화면 ===================== -->
+<div id="studentScreen" hidden>
+  <div class="s-wrap">
+    <div class="s-head">
+      <h2>🎨 내 캐릭터 그리기</h2>
+      <button class="backBtn" data-back>← 처음으로</button>
+    </div>
+
+    <div class="panel">
+      <canvas id="drawCanvas" width="320" height="320"></canvas>
+
+      <div class="swatches" id="swatches"></div>
+
+      <div class="tool-row">
+        <input type="color" id="colorPicker" value="#e53935" title="내가 고른 색">
+        <span>굵기</span>
+        <input type="range" id="sizeRange" min="2" max="34" value="9">
+        <button id="eraseBtn">지우개</button>
+        <button id="clearBtn">전체 지우기</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>✨ 예시 캐릭터 — 눌러서 불러온 뒤 색칠해도 좋아요</h3>
+      <div class="preset-grid" id="presetGrid"></div>
+    </div>
+
+    <div class="panel">
+      <input type="text" id="nameInput" maxlength="12" placeholder="이름 (안 써도 괜찮아요)">
+      <button id="sendBtn">🎺 퍼레이드로 보내기!</button>
+      <div id="sendMsg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 선생님 화면 ===================== -->
+<div id="teacherScreen" hidden>
+  <div class="t-bar">
+    <h2>🎬 우리 반 캐릭터 퍼레이드</h2>
+    <span id="countBadge">참가 캐릭터 0</span>
+    <button id="musicBtn">🎵 음악 시작</button>
+    <button id="resetBtn">🔄 새 퍼레이드 시작</button>
+    <button id="tBackBtn" data-back>← 처음으로</button>
+  </div>
+
+  <div id="stage">
+    <div id="ground">
+      <div id="stripes"></div>
+      <div id="groundGlow"></div>
+    </div>
+    <div id="stageMsg">학생들이 캐릭터를 보내면 이곳에서 행진을 시작해요! 🎺<br>학생 기기에서 같은 주소로 접속해 주세요.</div>
+  </div>
+</div>
+
+<!-- ===================== 오류 안내 ===================== -->
+<div id="bootError" hidden>
+  <div class="box">
+    <h3>연결하지 못했어요</h3>
+    <p id="bootErrorMsg"></p>
+    <button onclick="location.reload()">다시 시도</button>
+  </div>
+</div>
+
+<script type="module">
+/* ==================================================================
+   우리 반 캐릭터 퍼레이드
+   학생 기기에서 그린 캐릭터가 선생님 화면의 무대로 실시간 전달됩니다.
+
+   Firebase 프로젝트: brave-night-412309 — 이 발표회 전용입니다.
+   (디지털 시민성 수업과 파이썬 첫걸음 채점기는 각각 별도의 프로젝트를 쓰므로
+    이 규칙과 서로 영향을 주지 않습니다.)
+   아래 설정값은 공개되어도 안전한 "주소" 같은 값입니다. 비밀번호가 아닙니다.
+   실제 보안은 같은 폴더의 firestore.rules 가 담당합니다.
+================================================================== */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import {
+  getFirestore, collection, addDoc, query, orderBy,
+  onSnapshot, getDocs, writeBatch, doc
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyBLnifNDKz3GOWG3aoUruyp4bV8678IrqQ",
+  authDomain:        "brave-night-412309.firebaseapp.com",
+  projectId:         "brave-night-412309",
+  storageBucket:     "brave-night-412309.firebasestorage.app",
+  messagingSenderId: "189859182505",
+  appId:             "1:189859182505:web:3b5128e2b78694eee376b8"
+};
+
+/* 이 프로그램이 쓰는 컬렉션. 프로젝트가 이 발표회 전용이라 이것 하나뿐이다. */
+const COL = "pd_characters";
+
+const $ = (id) => document.getElementById(id);
+
+/* ------------------------------------------------------------------
+   Firebase 연결 — 학생도 선생님도 익명으로 들어온다.
+   로그인 화면 없이 같은 주소만으로 이어지는 구조라, 계정을 따로 만들지 않는다.
+   연결은 한 번만 하고 그 약속(Promise)을 재사용한다.
+------------------------------------------------------------------ */
+let db = null, uid = null, connecting = null;
+
+function connect(){
+  if (connecting) return connecting;
+  connecting = (async () => {
+    const app  = initializeApp(firebaseConfig, "parade");
+    const auth = getAuth(app);
+    db = getFirestore(app);
+    const cred = await signInAnonymously(auth);
+    uid = cred.user.uid;
+  })().catch((err) => {
+    connecting = null;              // 다음 시도를 막지 않는다
+    throw err;
+  });
+  return connecting;
+}
+
+function showBootError(err){
+  $("bootErrorMsg").textContent =
+    "인터넷 연결과 주소를 확인한 뒤 다시 시도해 주세요.\n\n(" + (err && err.message ? err.message : err) + ")";
+  $("bootError").hidden = false;
+}
+
+/* ------------------------------------------------------------------
+   화면 전환
+------------------------------------------------------------------ */
+const screens = { role:$("roleScreen"), student:$("studentScreen"), teacher:$("teacherScreen") };
+
+function show(which){
+  Object.keys(screens).forEach((k) => { screens[k].hidden = (k !== which); });
+  if (which !== "teacher") stopStage();
+}
+
+document.querySelectorAll("[data-back]").forEach((b) => {
+  b.addEventListener("click", () => { stopMusic(); show("role"); });
+});
+
+/* ------------------------------------------------------------------
+   역할 선택 화면 — 학생들에게 알려줄 주소와 QR코드
+------------------------------------------------------------------ */
+(function setupShare(){
+  const url = location.origin + location.pathname;
+  /* 한글 파일 이름은 %EC.. 처럼 길게 나오므로, 화면에는 풀어서 보여 준다.
+     복사와 QR코드에는 원래 주소를 그대로 쓴다. */
+  try { $("shareUrl").textContent = decodeURI(url); }
+  catch (e) { $("shareUrl").textContent = url; }
+
+  if (location.protocol === "file:") {
+    $("fileWarn").hidden = false;
+    $("shareBox").hidden = true;
+    return;
+  }
+  if (window.QRCode) {
+    try {
+      new QRCode($("qr"), { text:url, width:120, height:120, correctLevel:QRCode.CorrectLevel.M });
+    } catch (e) { $("qr").hidden = true; }
+  } else {
+    $("qr").hidden = true;      /* 인터넷이 막혀 라이브러리를 받지 못한 경우 */
+  }
+
+  $("copyBtn").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      $("copyBtn").textContent = "복사했어요!";
+    } catch (e) {
+      $("copyBtn").textContent = "주소를 길게 눌러 복사해 주세요";
+    }
+    setTimeout(() => { $("copyBtn").textContent = "주소 복사"; }, 2200);
+  });
+})();
+
+$("goStudent").addEventListener("click", async () => {
+  try { await connect(); show("student"); } catch (e) { showBootError(e); }
+});
+$("goTeacher").addEventListener("click", async () => {
+  try { await connect(); show("teacher"); startTeacher(); } catch (e) { showBootError(e); }
+});
+
+/* ==================================================================
+   학생 화면 — 그리기
+================================================================== */
+const canvas = $("drawCanvas");
+const ctx = canvas.getContext("2d", { willReadFrequently:true });
+const CW = canvas.width, CH = canvas.height;
+
+function clearCanvas(){
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, CW, CH);
+}
+clearCanvas();
+ctx.lineCap = "round";
+ctx.lineJoin = "round";
+
+let color   = $("colorPicker").value;
+let size    = Number($("sizeRange").value);
+let erasing = false;
+let drawing = false;
+
+/* 캔버스는 화면 폭에 맞춰 늘어나므로, 손가락 위치를 캔버스 좌표로 환산한다. */
+function getPos(e){
+  const r = canvas.getBoundingClientRect();
+  const t = e.touches && e.touches[0];
+  const cx = t ? t.clientX : e.clientX;
+  const cy = t ? t.clientY : e.clientY;
+  return { x:(cx - r.left) * (CW / r.width), y:(cy - r.top) * (CH / r.height) };
+}
+
+function strokeStyleNow(){
+  ctx.strokeStyle = erasing ? "#ffffff" : color;
+  ctx.lineWidth   = erasing ? size * 2 : size;
+}
+
+function startDraw(e){
+  drawing = true;
+  const p = getPos(e);
+  strokeStyleNow();
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  /* 한 번 톡 찍기만 해도 점이 남도록 */
+  ctx.lineTo(p.x + 0.01, p.y);
+  ctx.stroke();
+  e.preventDefault();
+}
+function moveDraw(e){
+  if (!drawing) return;
+  const p = getPos(e);
+  strokeStyleNow();
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  e.preventDefault();
+}
+function endDraw(){ drawing = false; }
+
+canvas.addEventListener("mousedown", startDraw);
+canvas.addEventListener("mousemove", moveDraw);
+canvas.addEventListener("mouseup", endDraw);
+canvas.addEventListener("mouseleave", endDraw);
+canvas.addEventListener("touchstart", startDraw, { passive:false });
+canvas.addEventListener("touchmove", moveDraw, { passive:false });
+canvas.addEventListener("touchend", endDraw);
+canvas.addEventListener("touchcancel", endDraw);
+
+/* 색상 팔레트 12색 */
+const PALETTE = ["#000000","#e53935","#fb8c00","#fdd835","#43a047","#00acc1",
+                 "#1e88e5","#5e35b1","#d81b60","#8d6e63","#bdbdbd","#ffffff"];
+
+const swatches = $("swatches");
+PALETTE.forEach((hex) => {
+  const b = document.createElement("button");
+  b.className = "swatch";
+  b.style.background = hex;
+  b.title = hex;
+  b.addEventListener("click", () => {
+    color = hex;
+    erasing = false;
+    $("eraseBtn").classList.remove("on");
+    $("colorPicker").value = hex;
+    swatches.querySelectorAll(".swatch").forEach((s) => s.classList.remove("on"));
+    b.classList.add("on");
+  });
+  swatches.appendChild(b);
+});
+swatches.children[1].classList.add("on");   // 처음엔 빨강
+
+$("colorPicker").addEventListener("input", (e) => {
+  color = e.target.value;
+  erasing = false;
+  $("eraseBtn").classList.remove("on");
+  swatches.querySelectorAll(".swatch").forEach((s) => s.classList.remove("on"));
+});
+$("sizeRange").addEventListener("input", (e) => { size = Number(e.target.value); });
+$("eraseBtn").addEventListener("click", () => {
+  erasing = !erasing;
+  $("eraseBtn").classList.toggle("on", erasing);
+});
+$("clearBtn").addEventListener("click", () => { clearCanvas(); });
+
+/* ------------------------------------------------------------------
+   예시 캐릭터 6종.
+   색을 칠하지 않은 밑그림(선)만 그려 주므로, 그림에 자신이 없는 학생도
+   색만 칠해서 참여할 수 있다.
+------------------------------------------------------------------ */
+function roundRect(g, x, y, w, h, r){
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y,     x + w, y + h, r);
+  g.arcTo(x + w, y + h, x,     y + h, r);
+  g.arcTo(x,     y + h, x,     y,     r);
+  g.arcTo(x,     y,     x + w, y,     r);
+  g.closePath();
+  g.stroke();
+}
+
+const PRESETS = [
+  { icon:"⭐", label:"별", draw(g){
+      const cx = 160, cy = 158, R = 118, r = 50;
+      g.beginPath();
+      for (let i = 0; i < 10; i++){
+        const rad = (i % 2 === 0) ? R : r;
+        const a = -Math.PI / 2 + i * Math.PI / 5;
+        const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.closePath(); g.stroke();
+    }},
+  { icon:"❤️", label:"하트", draw(g){
+      g.beginPath();
+      g.moveTo(160, 272);
+      g.bezierCurveTo(22, 180, 48, 52, 160, 112);
+      g.bezierCurveTo(272, 52, 298, 180, 160, 272);
+      g.closePath(); g.stroke();
+    }},
+  { icon:"🚀", label:"로켓", draw(g){
+      g.beginPath();
+      g.moveTo(160, 32);
+      g.bezierCurveTo(216, 94, 219, 180, 206, 234);
+      g.lineTo(114, 234);
+      g.bezierCurveTo(101, 180, 104, 94, 160, 32);
+      g.closePath(); g.stroke();
+      g.beginPath(); g.arc(160, 118, 29, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(114, 178); g.lineTo(62, 256); g.lineTo(114, 234); g.closePath(); g.stroke();
+      g.beginPath(); g.moveTo(206, 178); g.lineTo(258, 256); g.lineTo(206, 234); g.closePath(); g.stroke();
+      g.beginPath(); g.moveTo(128, 240); g.quadraticCurveTo(160, 304, 192, 240); g.stroke();
+    }},
+  { icon:"🐱", label:"고양이", draw(g){
+      g.beginPath(); g.moveTo(80, 108);  g.lineTo(94, 34);  g.lineTo(142, 72); g.stroke();
+      g.beginPath(); g.moveTo(240, 108); g.lineTo(226, 34); g.lineTo(178, 72); g.stroke();
+      g.beginPath(); g.ellipse(160, 150, 88, 78, 0, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.arc(131, 140, 11, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.arc(189, 140, 11, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(149, 170); g.lineTo(171, 170); g.lineTo(160, 183); g.closePath(); g.stroke();
+      g.beginPath();
+      g.moveTo(160, 183); g.lineTo(160, 194);
+      g.moveTo(160, 194); g.quadraticCurveTo(143, 208, 131, 193);
+      g.moveTo(160, 194); g.quadraticCurveTo(177, 208, 189, 193);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(70, 149);  g.lineTo(112, 157); g.moveTo(68, 175);  g.lineTo(112, 174);
+      g.moveTo(250, 149); g.lineTo(208, 157); g.moveTo(252, 175); g.lineTo(208, 174);
+      g.stroke();
+      g.beginPath(); g.moveTo(100, 200); g.quadraticCurveTo(160, 306, 220, 200); g.stroke();
+    }},
+  { icon:"🤖", label:"로봇", draw(g){
+      g.beginPath(); g.moveTo(160, 30); g.lineTo(160, 56); g.stroke();
+      g.beginPath(); g.arc(160, 22, 9, 0, Math.PI * 2); g.stroke();
+      roundRect(g, 104, 56, 112, 82, 14);
+      g.beginPath(); g.arc(133, 91, 10, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.arc(187, 91, 10, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(132, 118); g.lineTo(188, 118); g.stroke();
+      roundRect(g, 94, 148, 132, 96, 12);
+      g.beginPath(); g.arc(160, 184, 15, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(94, 168); g.lineTo(54, 208); g.moveTo(226, 168); g.lineTo(266, 208); g.stroke();
+      g.beginPath(); g.moveTo(126, 244); g.lineTo(126, 292); g.moveTo(194, 244); g.lineTo(194, 292); g.stroke();
+      g.beginPath(); g.moveTo(104, 292); g.lineTo(142, 292); g.moveTo(178, 292); g.lineTo(216, 292); g.stroke();
+    }},
+  { icon:"🌸", label:"꽃", draw(g){
+      for (let i = 0; i < 6; i++){
+        const a = -Math.PI / 2 + i * Math.PI / 3;
+        g.beginPath();
+        g.ellipse(160 + Math.cos(a) * 62, 128 + Math.sin(a) * 62, 38, 26, a, 0, Math.PI * 2);
+        g.stroke();
+      }
+      g.beginPath(); g.arc(160, 128, 30, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(160, 190); g.quadraticCurveTo(170, 250, 157, 304); g.stroke();
+      g.beginPath(); g.ellipse(118, 250, 34, 17, -0.5, 0, Math.PI * 2); g.stroke();
+    }}
+];
+
+const presetGrid = $("presetGrid");
+PRESETS.forEach((p) => {
+  const b = document.createElement("button");
+  b.innerHTML = '<span class="pico">' + p.icon + "</span>" + p.label;
+  b.addEventListener("click", () => {
+    clearCanvas();
+    ctx.save();
+    ctx.strokeStyle = "#3a3a3a";
+    ctx.lineWidth = 5;
+    p.draw(ctx);
+    ctx.restore();
+    erasing = false;
+    $("eraseBtn").classList.remove("on");
+  });
+  presetGrid.appendChild(b);
+});
+
+/* ------------------------------------------------------------------
+   그림을 퍼레이드용 그림으로 바꾸기
+   1) 그린 부분만 남기고 흰 여백을 잘라낸다
+   2) 남은 흰 배경을 투명하게 만든다
+   3) 무대에서 보이는 크기에 맞게 줄여, 전송량을 가볍게 한다
+   그린 것이 없으면 null 을 돌려준다.
+------------------------------------------------------------------ */
+const WHITE = 245;                 // 이 값보다 밝으면 배경으로 본다
+const MAX_BYTES = 280000;          // 규칙에서 막는 크기(300KB)보다 넉넉히 아래로
+
+function exportCharacter(){
+  const src = ctx.getImageData(0, 0, CW, CH).data;
+  let minX = CW, minY = CH, maxX = -1, maxY = -1;
+
+  for (let y = 0; y < CH; y++){
+    for (let x = 0; x < CW; x++){
+      const i = (y * CW + x) * 4;
+      if (!(src[i] > WHITE && src[i+1] > WHITE && src[i+2] > WHITE)){
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;        // 아무것도 그리지 않았다
+
+  const pad = 8;
+  minX = Math.max(0, minX - pad);  minY = Math.max(0, minY - pad);
+  maxX = Math.min(CW - 1, maxX + pad); maxY = Math.min(CH - 1, maxY + pad);
+  const w = maxX - minX + 1, h = maxY - minY + 1;
+
+  const cut = document.createElement("canvas");
+  cut.width = w; cut.height = h;
+  const cg = cut.getContext("2d", { willReadFrequently:true });
+  cg.drawImage(canvas, minX, minY, w, h, 0, 0, w, h);
+
+  const cd = cg.getImageData(0, 0, w, h);
+  const d = cd.data;
+  for (let i = 0; i < d.length; i += 4){
+    if (d[i] > WHITE && d[i+1] > WHITE && d[i+2] > WHITE) d[i+3] = 0;
+  }
+  cg.putImageData(cd, 0, 0);
+
+  /* 무대에서는 200px 안팎으로 보이므로 그 크기면 충분하다.
+     혹시 용량이 크면 한 단계씩 더 줄여 본다. */
+  for (const maxSide of [240, 190, 150]){
+    const k = Math.min(1, maxSide / Math.max(w, h));
+    const out = document.createElement("canvas");
+    out.width  = Math.max(1, Math.round(w * k));
+    out.height = Math.max(1, Math.round(h * k));
+    const og = out.getContext("2d");
+    og.imageSmoothingQuality = "high";
+    og.drawImage(cut, 0, 0, out.width, out.height);
+    const url = out.toDataURL("image/png");
+    if (url.length <= MAX_BYTES) return url;
+  }
+  return null;                       // 여기까지 오면 너무 크다
+}
+
+$("sendBtn").addEventListener("click", async () => {
+  const btn = $("sendBtn"), msg = $("sendMsg");
+
+  const img = exportCharacter();
+  if (!img){
+    msg.textContent = "먼저 캐릭터를 그려 주세요! (또는 그림이 너무 복잡해요)";
+    return;
+  }
+
+  btn.disabled = true;
+  msg.textContent = "보내는 중...";
+  try {
+    await addDoc(collection(db, COL), {
+      name: $("nameInput").value.trim().slice(0, 12),
+      img:  img,
+      uid:  uid,
+      at:   Date.now()
+    });
+    msg.textContent = "🎉 보냈어요! 큰 화면을 보세요. 또 그려도 좋아요.";
+    clearCanvas();
+  } catch (e){
+    msg.textContent = "보내지 못했어요. 잠시 뒤 다시 눌러 주세요. (" + (e.message || e) + ")";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ==================================================================
+   선생님 화면 — 퍼레이드 무대
+================================================================== */
+const stage   = $("stage");
+const stripes = $("stripes");
+const ground  = $("ground");
+
+const SPAWN_MS   = 2500;   // 캐릭터가 무대에 오르는 간격
+const MAX_ON_STAGE = 14;   // 무대에 한꺼번에 세우는 캐릭터 수
+const WALK_SPEED = 140;    // 행진 속도 (초당 px)
+const GROUND_SPEED = 90;   // 바닥 줄무늬가 흘러가는 속도 (초당 px)
+const STRIPE_PERIOD = 132; // 줄무늬 한 칸 (CSS 와 같은 값)
+
+let all = [];              // 지금까지 참가한 캐릭터 전체
+let waiting = [];          // 아직 무대에 오른 적 없는 캐릭터
+let cursor = 0;            // 전체를 돌아가며 다시 내보낼 때 쓰는 자리
+let marchers = [], clouds = [], confs = [];
+let rafId = null, spawnTimer = null, confTimer = null;
+let unsubscribe = null, lastTs = 0, stripeX = 0, wakeLock = null;
+
+function startTeacher(){
+  if (rafId) return;                       // 이미 돌고 있다
+
+  buildClouds();
+  lastTs = 0;
+  rafId = requestAnimationFrame(loop);
+  spawnTimer = setInterval(spawnNext, SPAWN_MS);
+  confTimer  = setInterval(spawnConfetti, 140);
+
+  /* 발표 중에 화면이 꺼지지 않도록 (지원하지 않는 브라우저는 조용히 넘어간다) */
+  if (navigator.wakeLock && navigator.wakeLock.request){
+    navigator.wakeLock.request("screen").then((l) => { wakeLock = l; }).catch(() => {});
+  }
+
+  listen();
+}
+
+function stopStage(){
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  clearInterval(spawnTimer); spawnTimer = null;
+  clearInterval(confTimer);  confTimer  = null;
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+
+  marchers.forEach((m) => m.el.remove()); marchers = [];
+  clouds.forEach((c) => c.el.remove());   clouds = [];
+  confs.forEach((c) => c.el.remove());    confs = [];
+  all = []; waiting = []; cursor = 0;
+  updateCount();
+}
+
+/* ------------------------------------------------------------------
+   학생들이 보낸 캐릭터를 실시간으로 받아온다.
+   처음 들어올 때는 그동안 쌓인 캐릭터가 보낸 순서대로 한꺼번에 들어오고,
+   그 뒤로는 새로 보낸 캐릭터가 하나씩 추가된다.
+------------------------------------------------------------------ */
+function listen(){
+  const q = query(collection(db, COL), orderBy("at"));
+  unsubscribe = onSnapshot(q,
+    (snap) => {
+      snap.docChanges().forEach((ch) => {
+        if (ch.type === "added"){
+          const c = { id:ch.doc.id, ...ch.doc.data() };
+          all.push(c);
+          waiting.push(c);
+        } else if (ch.type === "removed"){
+          all     = all.filter((c) => c.id !== ch.doc.id);
+          waiting = waiting.filter((c) => c.id !== ch.doc.id);
+        }
+      });
+      if (all.length === 0){                       // 초기화된 직후
+        marchers.forEach((m) => m.el.remove());
+        marchers = [];
+        cursor = 0;
+      }
+      updateCount();
+    },
+    (err) => { showBootError(err); }
+  );
+}
+
+function updateCount(){
+  $("countBadge").textContent = "참가 캐릭터 " + all.length;
+  $("stageMsg").hidden = all.length > 0;
+}
+
+/* 아직 등장하지 않은 캐릭터를 먼저 내보내고, 다 나왔으면 처음부터 다시 돈다.
+
+   화면이 가려져 있으면(선생님이 잠시 다른 창을 보는 동안) 브라우저가 그림
+   그리기를 멈춘다. 그때도 이 타이머는 계속 돌기 때문에, 그냥 두면 캐릭터가
+   무대 왼쪽 밖에 쌓였다가 돌아오는 순간 한꺼번에 쏟아진다. 그래서 가려져
+   있는 동안에는 내보내지 않고, 무대에 선 수도 함께 제한한다. */
+function spawnNext(){
+  if (document.hidden) return;
+  if (marchers.length >= MAX_ON_STAGE) return;
+  let c = null;
+  if (waiting.length)      c = waiting.shift();
+  else if (all.length)     c = all[cursor++ % all.length];
+  if (c) spawnMarcher(c);
+}
+
+function spawnMarcher(c){
+  const el = document.createElement("div");
+  el.className = "marcher";
+
+  const img = document.createElement("img");
+  img.src = c.img;
+  img.alt = "";
+  el.appendChild(img);
+
+  if (c.name){
+    const tag = document.createElement("div");
+    tag.className = "tag";
+    tag.textContent = c.name;
+    el.appendChild(tag);
+  }
+  stage.appendChild(el);
+
+  /* 바닥 띠 안에서 앞뒤로 자리를 나눈다.
+     아래쪽(lane 0)일수록 가까이 있는 것처럼 크게, 앞에 그린다. */
+  const groundH = ground.clientHeight;
+  const lane = Math.random();
+  const m = {
+    el:el,
+    x: -220 - Math.random() * 60,
+    base: -(groundH * 0.16 + lane * groundH * 0.55),
+    sc: 1.06 - lane * 0.3,
+    sp: WALK_SPEED * (0.9 + Math.random() * 0.25),
+    ph: Math.random() * Math.PI * 2,
+    t: 0
+  };
+  el.style.zIndex = String(Math.round((1 - lane) * 100));
+  marchers.push(m);
+}
+
+function buildClouds(){
+  const w = stage.clientWidth || 900;
+  const h = stage.clientHeight || 500;
+  for (let i = 0; i < 5; i++){
+    const el = document.createElement("div");
+    el.className = "cloud";
+    const cw = 90 + Math.random() * 130;
+    el.style.width  = cw + "px";
+    el.style.height = (cw * 0.34) + "px";
+    stage.appendChild(el);
+    clouds.push({
+      el:el, w:cw,
+      x: Math.random() * w,
+      y: h * (0.05 + Math.random() * 0.28),
+      sp: 10 + Math.random() * 18
+    });
+  }
+}
+
+const CONFETTI_COLORS = ["#ffd700","#ff6b95","#4CAF50","#42a5f5","#ffa726","#ab47bc"];
+const CONFETTI_MAX = 70;
+
+function spawnConfetti(){
+  if (document.hidden) return;
+  if (confs.length >= CONFETTI_MAX) return;
+  const el = document.createElement("div");
+  el.className = "confetti";
+  el.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+  stage.appendChild(el);
+  confs.push({
+    el:el,
+    x: Math.random() * (stage.clientWidth || 900),
+    y: -20,
+    vy: 55 + Math.random() * 85,
+    sway: 18 + Math.random() * 30,
+    ph: Math.random() * Math.PI * 2,
+    spin: (Math.random() * 2 - 1) * 220,
+    t: 0
+  });
+}
+
+function loop(ts){
+  const dt = lastTs ? Math.min(0.05, (ts - lastTs) / 1000) : 0;
+  lastTs = ts;
+
+  const w = stage.clientWidth, h = stage.clientHeight;
+
+  /* 바닥 줄무늬가 뒤로 흘러가며 앞으로 나아가는 느낌을 준다 */
+  stripeX = (stripeX - GROUND_SPEED * dt) % STRIPE_PERIOD;
+  stripes.style.transform = "translateX(" + stripeX + "px)";
+
+  /* 구름 — 화면 밖으로 나가면 반대쪽에서 다시 나타난다 */
+  for (const c of clouds){
+    c.x -= c.sp * dt;
+    if (c.x < -c.w - 30){
+      c.x = w + 30 + Math.random() * 250;
+      c.y = h * (0.05 + Math.random() * 0.28);
+    }
+    c.el.style.transform = "translate(" + c.x + "px," + c.y + "px)";
+  }
+
+  /* 캐릭터 행진 — 통통 튀며 무대를 가로지른다 */
+  for (let i = marchers.length - 1; i >= 0; i--){
+    const m = marchers[i];
+    m.x += m.sp * dt;
+    m.t += dt;
+    if (m.x > w + 240){
+      m.el.remove();
+      marchers.splice(i, 1);
+      continue;
+    }
+    const wave = Math.sin(m.t * 6.5 + m.ph);
+    m.el.style.transform =
+      "translate(" + m.x + "px," + (m.base + wave * 9) + "px)" +
+      " rotate(" + (wave * 3) + "deg) scale(" + m.sc + ")";
+  }
+
+  /* 컨페티 */
+  for (let i = confs.length - 1; i >= 0; i--){
+    const c = confs[i];
+    c.t += dt;
+    c.y += c.vy * dt;
+    if (c.y > h + 30){
+      c.el.remove();
+      confs.splice(i, 1);
+      continue;
+    }
+    const x = c.x + Math.sin(c.t * 1.8 + c.ph) * c.sway;
+    c.el.style.transform =
+      "translate(" + x + "px," + c.y + "px) rotate(" + (c.t * c.spin) + "deg)";
+  }
+
+  rafId = requestAnimationFrame(loop);
+}
+
+/* ------------------------------------------------------------------
+   새 퍼레이드 시작 — 참가 기록을 모두 지운다.
+   Firestore 는 한 번에 500건까지 묶어 지울 수 있어 400건씩 나눈다.
+------------------------------------------------------------------ */
+$("resetBtn").addEventListener("click", async () => {
+  const ok = confirm(
+    "지금까지 참가한 캐릭터를 모두 지우고 새 퍼레이드를 시작할까요?\n" +
+    "지운 기록은 되돌릴 수 없습니다."
+  );
+  if (!ok) return;
+
+  const btn = $("resetBtn");
+  btn.disabled = true;
+  const before = btn.textContent;
+  btn.textContent = "지우는 중...";
+  try {
+    const snap = await getDocs(collection(db, COL));
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += 400){
+      const batch = writeBatch(db);
+      docs.slice(i, i + 400).forEach((d) => batch.delete(doc(db, COL, d.id)));
+      await batch.commit();
+    }
+    btn.textContent = "초기화 완료!";
+    setTimeout(() => { btn.textContent = before; }, 1800);
+  } catch (e){
+    alert("초기화하지 못했어요.\n(" + (e.message || e) + ")");
+    btn.textContent = before;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ------------------------------------------------------------------
+   행진곡 — 금관 멜로디 + 베이스 + 드럼 + 심벌 크래시, 132BPM
+------------------------------------------------------------------ */
+const MELODY = [
+  "C5","E5","G5","C6","G5","E5","C5","G4",
+  "C5","D5","E5","G5","E5","D5","C5","B4",
+  "C5","E5","G5","C6","G5","E5","C5","G4",
+  "G5","F5","E5","D5","C5","D5","E5","C5"
+];
+const BASS = ["C3","G3","C3","G3","C3","G3","C3","G3"];
+
+let musicOn   = false;
+let musicBusy = false;   // 시작과 정지가 겹쳐 악단이 둘로 늘어나는 것을 막는다
+let musicNodes = [];     // 이번에 만든 악기와 반복 재생을 하나도 빠짐없이 모아 둔다
+
+/* 만든 것을 모두 여기 담아 두어야 정지할 때 전부 끌 수 있다.
+   담아 두지 않은 악기는 참조를 잃어 다시는 멈출 수 없다. */
+function keep(node){ musicNodes.push(node); return node; }
+
+async function startMusic(){
+  await Tone.start();
+
+  const lead = keep(new Tone.PolySynth(Tone.Synth, {
+    oscillator:{ type:"sawtooth" },
+    envelope:{ attack:0.01, decay:0.15, sustain:0.35, release:0.25 }
+  }).toDestination());
+  lead.volume.value = -6;
+
+  const bass = keep(new Tone.Synth({
+    oscillator:{ type:"triangle" },
+    envelope:{ attack:0.01, decay:0.2, sustain:0.2, release:0.15 }
+  }).toDestination());
+  bass.volume.value = -7;
+
+  const kick = keep(new Tone.MembraneSynth({
+    octaves:4, envelope:{ attack:0.001, decay:0.3, sustain:0 }
+  }).toDestination());
+  kick.volume.value = -6;
+
+  const snare = keep(new Tone.NoiseSynth({
+    noise:{ type:"white" }, envelope:{ attack:0.001, decay:0.12, sustain:0 }
+  }).toDestination());
+  snare.volume.value = -11;
+
+  const cymbal = keep(new Tone.MetalSynth({
+    envelope:{ attack:0.001, decay:0.6, release:0.2 },
+    harmonicity:5.1, resonance:3000, octaves:1.2
+  }).toDestination());
+  cymbal.volume.value = -18;
+
+  let step = 0, beat = 0;
+  Tone.Transport.bpm.value = 132;
+
+  keep(new Tone.Loop((time) => {
+    lead.triggerAttackRelease(MELODY[step % MELODY.length], "16n", time);
+    step++;
+  }, "8n").start(0));
+
+  keep(new Tone.Loop((time) => {
+    bass.triggerAttackRelease(BASS[beat % BASS.length], "8n", time);
+    if (beat % 2 === 0) kick.triggerAttackRelease("C1", "8n", time);
+    else                snare.triggerAttackRelease("16n", time);
+    beat++;
+  }, "4n").start(0));
+
+  /* 두 마디마다 심벌로 신나는 포인트를 준다 */
+  keep(new Tone.Loop((time) => {
+    cymbal.triggerAttackRelease("8n", time);
+  }, "2m").start(0));
+
+  Tone.Transport.start();
+}
+
+/* musicOn 을 따지지 않고, 만들어 둔 것을 무조건 모두 끈다.
+   시작하다 오류가 났든 버튼이 겹쳐 눌렸든 소리가 남지 않도록 한다. */
+function stopMusic(){
+  if (!window.Tone) return;
+  Tone.Transport.stop();
+  Tone.Transport.cancel();
+  musicNodes.forEach((n) => { try { n.dispose(); } catch (e) {} });
+  musicNodes = [];
+  musicOn = false;
+  $("musicBtn").textContent = "🎵 음악 시작";
+}
+
+$("musicBtn").addEventListener("click", async () => {
+  if (musicBusy) return;          // 연달아 누르는 동안에는 받지 않는다
+  musicBusy = true;
+  const btn = $("musicBtn");
+  btn.disabled = true;
+  try {
+    if (musicOn){
+      stopMusic();
+    } else {
+      await startMusic();
+      musicOn = true;
+      btn.textContent = "⏸️ 음악 정지";
+    }
+  } catch (e){
+    stopMusic();                  // 켜다 만 악기가 남아 울리지 않도록 정리한다
+    alert("소리를 켜지 못했어요.\n(" + (e.message || e) + ")");
+  } finally {
+    btn.disabled = false;
+    musicBusy = false;
+  }
+});
+</script>
+</body>
+</html>

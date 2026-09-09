@@ -1,0 +1,59 @@
+rules_version = '2';
+
+// ------------------------------------------------------------------
+// 우리 반 캐릭터 퍼레이드 — Firestore 보안 규칙
+//
+// Firebase 프로젝트: brave-night-412309 — 이 발표회 하나만 씁니다.
+// (디지털 시민성 수업은 kim-digital, 파이썬 첫걸음 채점기는 또 다른
+//  프로젝트를 쓰므로 여기 규칙과 서로 영향을 주지 않습니다.)
+//
+// 올리는 방법 — 이 폴더에서 아래 한 줄이면 됩니다.
+//     firebase deploy --only firestore:rules
+// 콘솔에서 넣으려면 Firestore Database > 규칙 탭에 통째로 붙여넣고 "게시".
+//
+// 요약
+//  - 이 수업에는 로그인 화면이 없습니다. 학생도 선생님도 같은 주소로 들어와
+//    익명으로 연결되고, 역할은 화면에서 고르는 값일 뿐입니다.
+//  - 그래서 "선생님만" 을 계정으로 가려낼 수 없고, 대신 오갈 수 있는 내용을
+//    좁게 묶어 둡니다.
+//  - 오가는 것은 그림 한 장과 이름표뿐입니다. 개인정보를 담지 않습니다.
+// ------------------------------------------------------------------
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // 학생들이 보낸 캐릭터.
+    //
+    //  - 그림은 보낸 사람의 uid 를 함께 적어 둡니다.
+    //  - 한 번 보낸 그림은 고칠 수 없습니다(update 금지). 장난으로 남의
+    //    그림을 바꿔치기하는 일을 막습니다.
+    //  - 지우기는 선생님 화면의 "새 퍼레이드 시작" 버튼이 씁니다. 이 버튼은
+    //    선생님 화면에만 있지만, 로그인이 없으므로 규칙만으로는 누른 사람을
+    //    가릴 수 없습니다. 발표회가 끝나면 아래 create 를 잠시 막아 두거나,
+    //    수업용으로만 쓰는 주소를 공유하세요.
+    match /pd_characters/{id} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 12
+        && request.resource.data.img is string
+        && request.resource.data.img.size() < 300000
+        && request.resource.data.img.matches('data:image/png;base64,.*')
+        && request.resource.data.at is number
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'img', 'at']);
+
+      allow update: if false;
+      allow delete: if isSignedIn();
+    }
+
+    // 그 밖의 모든 경로는 막는다.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
