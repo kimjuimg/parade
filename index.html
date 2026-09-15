@@ -110,6 +110,21 @@ button:disabled { opacity:.45; cursor:not-allowed; transform:none; }
 }
 #sendMsg { text-align:center; margin-top:10px; font-size:.88em; min-height:1.4em; line-height:1.5; }
 
+/* 선생님 확인 번호 */
+.code-box {
+  margin-top:18px; background:rgba(0,0,0,.3); border-radius:18px;
+  padding:14px 16px; max-width:520px; width:100%; text-align:left; font-size:.9em;
+}
+.code-box b { display:block; margin-bottom:8px; }
+.code-row { display:flex; gap:8px; flex-wrap:wrap; }
+#codeInput {
+  flex:1 1 130px; min-width:0; padding:10px 12px; border:none; border-radius:12px;
+  font-size:1em; font-family:inherit; color:#333; letter-spacing:.2em; text-align:center;
+}
+#codeOkBtn { background:#fff; color:#333; border-radius:20px; padding:10px 16px; }
+#codeCancelBtn { background:rgba(255,255,255,.25); color:#fff; border-radius:20px; padding:10px 14px; }
+#codeMsg { margin-top:8px; min-height:1.3em; font-size:.92em; }
+
 /* ===================== 선생님 화면 ===================== */
 #teacherScreen { height:100%; display:flex; flex-direction:column; }
 .t-bar {
@@ -194,6 +209,19 @@ button:disabled { opacity:.45; cursor:not-allowed; transform:none; }
       선생님이에요
       <span class="desc">전자칠판에 띄우는<br>퍼레이드 무대예요</span>
     </button>
+  </div>
+
+  <!-- 선생님 화면은 확인 번호를 넣어야 열린다. 학생이 무대 화면에 들어와
+       "새 퍼레이드 시작" 을 눌러 버리는 일을 막기 위해서다. -->
+  <div class="code-box" id="codeBox" hidden>
+    <b>🔒 선생님 확인 번호를 넣어 주세요</b>
+    <div class="code-row">
+      <input type="text" id="codeInput" inputmode="numeric" maxlength="8"
+             autocomplete="off" placeholder="숫자 4자리">
+      <button id="codeOkBtn">들어가기</button>
+      <button id="codeCancelBtn">취소</button>
+    </div>
+    <p id="codeMsg"></p>
   </div>
 
   <div class="share-box" id="shareBox">
@@ -305,6 +333,20 @@ const firebaseConfig = {
 /* 이 프로그램이 쓰는 컬렉션. 프로젝트가 이 발표회 전용이라 이것 하나뿐이다. */
 const COL = "pd_characters";
 
+/* ------------------------------------------------------------------
+   선생님 화면을 여는 확인 번호.
+
+   학생도 선생님도 같은 주소로 들어오고 역할은 화면에서 고르는 값일 뿐이라,
+   그냥 두면 학생이 무대 화면에 들어와 "새 퍼레이드 시작" 을 눌러 참가
+   기록을 통째로 지울 수 있다. 이 번호가 그 문을 잠근다.
+
+   ※ 이 값은 HTML 안에 있으므로 소스 보기로 열면 보인다. 완벽한 자물쇠가
+     아니라 "실수로 또는 장난으로 들어오는 것"을 막는 문고리다. 반마다
+     아래 숫자를 바꿔서 쓰고, 학생에게는 알려주지 않는다.
+------------------------------------------------------------------ */
+const TEACHER_CODE = "1234";
+const CODE_KEY = "pd_teacher_ok";   // 한 번 맞히면 그 기기에서는 다시 묻지 않는다
+
 const $ = (id) => document.getElementById(id);
 
 /* ------------------------------------------------------------------
@@ -386,8 +428,42 @@ document.querySelectorAll("[data-back]").forEach((b) => {
 $("goStudent").addEventListener("click", async () => {
   try { await connect(); show("student"); } catch (e) { showBootError(e); }
 });
-$("goTeacher").addEventListener("click", async () => {
-  try { await connect(); show("teacher"); startTeacher(); } catch (e) { showBootError(e); }
+/* 선생님 화면은 확인 번호를 맞혀야 열린다. 발표회 도중 새로고침해도 다시
+   묻지 않도록, 한 번 맞힌 기기에는 표시를 남겨 둔다. */
+function teacherUnlocked(){
+  try { return localStorage.getItem(CODE_KEY) === TEACHER_CODE; }
+  catch (e) { return false; }        // 사생활 보호 모드 등으로 저장이 막힌 경우
+}
+
+async function enterTeacher(){
+  try { await connect(); show("teacher"); startTeacher(); }
+  catch (e) { showBootError(e); }
+}
+
+$("goTeacher").addEventListener("click", () => {
+  if (teacherUnlocked()) { enterTeacher(); return; }
+  $("codeBox").hidden = false;
+  $("codeMsg").textContent = "";
+  $("codeInput").value = "";
+  $("codeInput").focus();
+});
+
+$("codeCancelBtn").addEventListener("click", () => { $("codeBox").hidden = true; });
+
+$("codeOkBtn").addEventListener("click", () => {
+  if ($("codeInput").value.trim() !== TEACHER_CODE){
+    $("codeMsg").textContent = "번호가 달라요. 다시 넣어 주세요.";
+    $("codeInput").value = "";
+    $("codeInput").focus();
+    return;
+  }
+  try { localStorage.setItem(CODE_KEY, TEACHER_CODE); } catch (e) {}
+  $("codeBox").hidden = true;
+  enterTeacher();
+});
+
+$("codeInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("codeOkBtn").click();
 });
 
 /* ==================================================================
@@ -657,8 +733,59 @@ function exportCharacter(){
   return null;                       // 여기까지 오면 너무 크다
 }
 
+/* ------------------------------------------------------------------
+   이름표 거르기 — 욕설·놀리는 말과 'ㅗ' 표시를 막는다.
+
+   "ㅗ  ㅗ" 처럼 사이에 띄어쓰기나 점을 끼워 넣어 피해 가는 경우가 많으므로,
+   한글·영문·숫자만 남기고 붙인 다음에 비교한다. 자음·모음 하나짜리(ㅗ, ㅅㅂ)
+   도 그대로 남기 때문에 함께 걸러진다.
+
+   목록에 없는 말은 당연히 못 거른다. 그림으로 그린 손 모양도 컴퓨터가
+   알아볼 수 없으니, 무대는 선생님이 함께 보면서 걸러 주셔야 한다.
+------------------------------------------------------------------ */
+const BAD_WORDS = [
+  "ㅗ", "凸",
+  "바보", "멍청", "병신", "ㅂㅅ", "ㅄ", "등신", "찐따", "저능",
+  "싫어", "미워", "꺼져", "닥쳐", "ㄷㅊ", "죽어", "뒤져", "죽을래",
+  "시발", "씨발", "씨팔", "시팔", "ㅅㅂ", "ㅆㅂ", "존나", "좆", "지랄",
+  "새끼", "쌔끼", "개놈", "개년", "개소리", "엿먹", "미친", "또라이", "돌아이"
+];
+
+/* 비교하기 좋게 다듬는다 — 한글(자모 포함)·영문·숫자만 남기고 소문자로. */
+function squash(t){
+  return String(t).normalize("NFC").toLowerCase()
+    .replace(/[^0-9a-z가-힣ㄱ-ㅎㅏ-ㅣ凸]/g, "");
+}
+
+/* 걸리는 말이 있으면 그 말을, 없으면 null 을 돌려준다. */
+function badWordIn(raw){
+  const t = squash(raw);
+  for (const w of BAD_WORDS){
+    const k = squash(w);
+    if (k && t.includes(k)) return w;
+  }
+  if (/🖕|🤬/u.test(String(raw))) return "손 모양";   // 🖕 등
+  return null;
+}
+
+const BAD_MSG = "이름표에 쓸 수 없는 말이 있어요. 고운 말로 바꿔 주세요. 🙂";
+
+/* 다 쓰고 보내기를 누르기 전에 미리 알려 준다. */
+$("nameInput").addEventListener("input", () => {
+  const bad = badWordIn($("nameInput").value);
+  $("sendBtn").disabled = !!bad;
+  $("sendMsg").textContent = bad ? BAD_MSG : "";
+});
+
 $("sendBtn").addEventListener("click", async () => {
   const btn = $("sendBtn"), msg = $("sendMsg");
+
+  const name = $("nameInput").value.trim().slice(0, 12);
+  if (badWordIn(name)){
+    msg.textContent = BAD_MSG;
+    $("nameInput").focus();
+    return;
+  }
 
   const img = exportCharacter();
   if (!img){
@@ -670,7 +797,7 @@ $("sendBtn").addEventListener("click", async () => {
   msg.textContent = "보내는 중...";
   try {
     await addDoc(collection(db, COL), {
-      name: $("nameInput").value.trim().slice(0, 12),
+      name: name,
       img:  img,
       uid:  uid,
       at:   Date.now()
@@ -693,6 +820,7 @@ const ground  = $("ground");
 
 const SPAWN_MS   = 2500;   // 캐릭터가 무대에 오르는 간격
 const MAX_ON_STAGE = 14;   // 무대에 한꺼번에 세우는 캐릭터 수
+const MAX_SHOWS  = 3;      // 한 캐릭터가 무대에 오르는 횟수
 const WALK_SPEED = 140;    // 행진 속도 (초당 px)
 const GROUND_SPEED = 90;   // 바닥 줄무늬가 흘러가는 속도 (초당 px)
 const STRIPE_PERIOD = 132; // 줄무늬 한 칸 (CSS 와 같은 값)
@@ -703,6 +831,12 @@ let cursor = 0;            // 전체를 돌아가며 다시 내보낼 때 쓰는
 let marchers = [], clouds = [], confs = [];
 let rafId = null, spawnTimer = null, confTimer = null;
 let unsubscribe = null, lastTs = 0, stripeX = 0, wakeLock = null;
+
+/* 무대가 비어 있을 때 가운데에 띄우는 안내 문구 */
+const MSG_WAIT = "학생들이 캐릭터를 보내면 이곳에서 행진을 시작해요! 🎺"
+               + "<br>학생 기기에서 같은 주소로 접속해 주세요.";
+const MSG_DONE = "모두 " + MAX_SHOWS + "번씩 행진을 마쳤어요! 🎉"
+               + "<br>새 캐릭터가 오면 다시 행진을 시작합니다.";
 
 function startTeacher(){
   if (rafId) return;                       // 이미 돌고 있다
@@ -746,7 +880,7 @@ function listen(){
     (snap) => {
       snap.docChanges().forEach((ch) => {
         if (ch.type === "added"){
-          const c = { id:ch.doc.id, ...ch.doc.data() };
+          const c = { id:ch.doc.id, ...ch.doc.data(), shows:0 };
           all.push(c);
           waiting.push(c);
         } else if (ch.type === "removed"){
@@ -767,10 +901,28 @@ function listen(){
 
 function updateCount(){
   $("countBadge").textContent = "참가 캐릭터 " + all.length;
-  $("stageMsg").hidden = all.length > 0;
+  updateStageMsg();
+}
+
+/* 무대가 비었을 때만 안내를 띄운다.
+   아직 아무도 보내지 않았으면 접속 안내를, 모두 MAX_SHOWS 번을 채웠으면
+   마쳤다는 안내를 보여 준다. */
+function updateStageMsg(){
+  const msg = $("stageMsg");
+  if (marchers.length > 0){ msg.hidden = true; return; }
+  if (all.length === 0){ msg.innerHTML = MSG_WAIT; msg.hidden = false; return; }
+  if (paradeDone()){ msg.innerHTML = MSG_DONE; msg.hidden = false; return; }
+  msg.hidden = true;
+}
+
+/* 기다리는 캐릭터도 없고 모두 정해진 횟수를 채웠으면 행진이 끝난 것이다. */
+function paradeDone(){
+  return waiting.length === 0 && all.every((c) => c.shows >= MAX_SHOWS);
 }
 
 /* 아직 등장하지 않은 캐릭터를 먼저 내보내고, 다 나왔으면 처음부터 다시 돈다.
+   다만 한 캐릭터가 MAX_SHOWS 번을 채우면 더 내보내지 않는다. 참가한 학생이
+   많을수록 같은 캐릭터가 자꾸 되돌아와 무대가 붐비기 때문이다.
 
    화면이 가려져 있으면(선생님이 잠시 다른 창을 보는 동안) 브라우저가 그림
    그리기를 멈춘다. 그때도 이 타이머는 계속 돌기 때문에, 그냥 두면 캐릭터가
@@ -779,10 +931,20 @@ function updateCount(){
 function spawnNext(){
   if (document.hidden) return;
   if (marchers.length >= MAX_ON_STAGE) return;
-  let c = null;
-  if (waiting.length)      c = waiting.shift();
-  else if (all.length)     c = all[cursor++ % all.length];
-  if (c) spawnMarcher(c);
+  const c = waiting.length ? waiting.shift() : nextEncore();
+  if (!c) { updateStageMsg(); return; }
+  c.shows++;
+  spawnMarcher(c);
+}
+
+/* 이미 나왔던 캐릭터 중 아직 MAX_SHOWS 번을 채우지 않은 캐릭터를 차례대로
+   찾는다. 다 채우고 나면 null 을 돌려주어 행진이 조용히 끝난다. */
+function nextEncore(){
+  for (let i = 0; i < all.length; i++){
+    const c = all[cursor++ % all.length];
+    if (c.shows < MAX_SHOWS) return c;
+  }
+  return null;
 }
 
 function spawnMarcher(c){
@@ -888,6 +1050,7 @@ function loop(ts){
     if (m.x > w + 240){
       m.el.remove();
       marchers.splice(i, 1);
+      if (marchers.length === 0) updateStageMsg();
       continue;
     }
     const wave = Math.sin(m.t * 6.5 + m.ph);
