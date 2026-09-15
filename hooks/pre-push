@@ -1,0 +1,68 @@
+#!/bin/sh
+# ------------------------------------------------------------------
+# firestore.rules 자동 배포 훅 (pre-push)
+#
+# 왜 있나
+#   이 프로그램의 보안은 firestore.rules 가 담당하는데, 이 파일은 git 에
+#   커밋한다고 서버에 올라가지 않는다. 파일만 고치고 push 하면 화면은 새
+#   코드인데 규칙은 옛것이라, 학생 화면과 선생님 무대가 통째로
+#   "연결하지 못했어요 / Missing or insufficient permissions" 로 막힌다.
+#   실제로 한 번 그렇게 막혔다. 그래서 push 할 때 규칙도 같이 올린다.
+#
+# 언제 도나
+#   이번에 올려보내는 커밋들 안에 firestore.rules 변경이 있을 때만 돈다.
+#   그 외의 push 는 아무것도 하지 않고 지나간다.
+#
+# 배포에 실패하면 push 를 멈춘다. 규칙이 안 올라간 채로 사이트만 새로
+#   나가는 상황을 막기 위해서다. 사정이 있어 그냥 밀어야 하면
+#       git push --no-verify
+#   로 건너뛸 수 있다. 대신 나중에 손으로
+#       firebase deploy --only firestore:rules
+#   를 꼭 실행해야 한다.
+# ------------------------------------------------------------------
+
+RULES="firestore.rules"
+ZERO="0000000000000000000000000000000000000000"
+changed=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # 브랜치를 지우는 push 는 볼 것이 없다
+    [ "$local_sha" = "$ZERO" ] && continue
+
+    if [ "$remote_sha" = "$ZERO" ] || ! git cat-file -e "$remote_sha" 2>/dev/null; then
+        # 원격에 견줄 것이 없는 새 브랜치 — 파일이 있으면 올린 적 없다고 본다
+        git cat-file -e "$local_sha:$RULES" 2>/dev/null && changed=1
+    else
+        [ -n "$(git diff --name-only "$remote_sha" "$local_sha" -- "$RULES")" ] && changed=1
+    fi
+done
+
+[ "$changed" = "0" ] && exit 0
+
+echo ""
+echo "firestore.rules 가 바뀌었습니다. Firestore 에 규칙을 올립니다..."
+echo ""
+
+if ! command -v firebase >/dev/null 2>&1; then
+    echo "firebase 명령을 찾지 못했습니다."
+    echo "  npm install -g firebase-tools   로 설치한 뒤 다시 push 해 주세요."
+    echo "  (지금 그냥 올리려면 git push --no-verify)"
+    exit 1
+fi
+
+if ! firebase deploy --only firestore:rules; then
+    echo ""
+    echo "규칙을 올리지 못해 push 를 멈췄습니다."
+    echo "이대로 push 하면 화면만 새로 나가고 규칙은 옛것이라,"
+    echo "학생도 선생님도 \"연결하지 못했어요\" 화면을 보게 됩니다."
+    echo ""
+    echo "  - 로그인이 풀렸다면:  firebase login"
+    echo "  - 인터넷이 안 되면 잠시 뒤 다시 push"
+    echo "  - 그래도 지금 밀어야 하면:  git push --no-verify"
+    exit 1
+fi
+
+echo ""
+echo "규칙을 올렸습니다. 이어서 push 합니다."
+echo ""
+exit 0

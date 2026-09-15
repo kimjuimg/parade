@@ -19,6 +19,7 @@
 - `firestore.rules` — 보안 규칙
 - `firebase.json`, `.firebaserc` — Firebase 배포 설정
 - `vercel.json` — 웹 배포 설정
+- `hooks/pre-push` — push 할 때 보안 규칙을 자동으로 배포하는 git 훅
 - `캐릭터_퍼레이드.html` — 초기 단일 기기 버전. 한 대에서 그리기와 무대를 함께 보여 줍니다.
   발표회 당일에는 쓰지 않습니다.
 
@@ -35,6 +36,22 @@ HTML 안의 `firebaseConfig` 값은 공개되어도 안전한 "주소" 같은 �
 ```bash
 firebase deploy --only firestore:rules
 ```
+
+### 규칙 배포는 자동으로 따라갑니다
+
+`firestore.rules` 는 git 에 커밋한다고 서버에 올라가지 않습니다. 파일만 고치고
+push 하면 화면은 새 코드인데 규칙은 옛것이라, 학생 화면과 선생님 무대가 통째로
+"연결하지 못했어요" 로 막힙니다. 실제로 한 번 그렇게 막힌 적이 있습니다.
+
+그래서 `hooks/pre-push` 훅을 두었습니다. push 할 때 올려보내는 커밋 안에
+`firestore.rules` 변경이 있으면 위 배포 명령을 먼저 실행하고, 배포에 실패하면
+push 를 멈춥니다. 규칙이 안 올라간 채로 사이트만 새로 나가는 일을 막기 위해서입니다.
+
+이 폴더에서는 `git config core.hooksPath hooks` 가 이미 되어 있습니다. **다른 곳에
+새로 clone 했다면 그 한 줄을 다시 실행해야** 훅이 돕니다.
+
+사정이 있어 그냥 밀어야 하면 `git push --no-verify` 로 건너뛸 수 있습니다. 대신
+나중에 손으로 배포 명령을 꼭 실행하세요.
 
 ### 처음 설정할 때
 
