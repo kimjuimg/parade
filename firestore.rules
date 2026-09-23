@@ -1,43 +1,155 @@
 rules_version = '2';
 
-// ------------------------------------------------------------------
-// 우리 반 캐릭터 퍼레이드 — Firestore 보안 규칙
+// 같은 파이어베이스 프로젝트(brave-night-412309)를 쓰는 수업 프로그램들의 보안 규칙
 //
-// Firebase 프로젝트: brave-night-412309 — 이 발표회 하나만 씁니다.
-// (디지털 시민성 수업은 kim-digital, 파이썬 첫걸음 채점기는 또 다른
-//  프로젝트를 쓰므로 여기 규칙과 서로 영향을 주지 않습니다.)
+//   mazeRooms      — 햄스터봇 미로 탈출 · 수학 미로 설계 경주 등   (E:\hamster-엔트리연결\클라우드)
+//   mathRooms      — 수학 미로 대결                              (E:\마이크로비트-햄스터)
+//   pd_characters  — 우리 반 캐릭터 퍼레이드 (parade-nine.vercel.app, GitHub kimjuimg/parade)
 //
-// 올리는 방법 — 이 폴더에서 아래 한 줄이면 됩니다.
+// ⚠️ 햄스터 쪽 규칙만 배포되면서(가장 최근은 2026-09-21) 퍼레이드 규칙이 통째로 지워져
+//    퍼레이드가 "Missing or insufficient permissions" 로 멈춘 일이 두 번 있었습니다.
+//    규칙은 프로젝트에 하나뿐이라, 배포하면 파일에 없는 경로는 모두 잠깁니다.
+//    그래서 세 프로그램 규칙을 이 한 파일에 모두 두고, 똑같은 파일을
+//    hamster-엔트리연결\클라우드 · hamster-공개수업\클라우드 · parade 저장소에 둡니다.
+//    어느 한 곳을 고치면 나머지 두 곳도 똑같이 고쳐 주세요.
+//
+// 규칙은 hamster-엔트리연결\클라우드 폴더에서 배포합니다.
 //     firebase deploy --only firestore:rules
-// 콘솔에서 넣으려면 Firestore Database > 규칙 탭에 통째로 붙여넣고 "게시".
+// (--only firestore:rules 는 규칙만 올리고 화면 파일은 건드리지 않습니다.)
 //
-// 요약
-//  - 이 수업에는 로그인 화면이 없습니다. 학생도 선생님도 같은 주소로 들어와
-//    익명으로 연결되고, 역할은 화면에서 고르는 값일 뿐입니다.
-//  - 그래서 "선생님만" 을 계정으로 가려낼 수 없고, 대신 오갈 수 있는 내용을
-//    좁게 묶어 둡니다.
-//  - 오가는 것은 그림 한 장과 이름표뿐입니다. 개인정보를 담지 않습니다.
-// ------------------------------------------------------------------
+// 미로 두 게임은 로그인 없이 교실에서 바로 쓰려고 만들었기 때문에 위 경로만
+// 열어 두고 나머지는 모두 막았습니다. 저장하는 값은 모둠 번호·모둠 이름·말판
+// 안 위치·점수뿐이며 개인정보는 담지 않습니다. 열려 있는 경로라도 아래 조건에
+// 맞는 모양의 데이터만 쓸 수 있습니다.
+//
+// 필드 이름을 늘릴 때는 반드시 아래 hasOnly 목록에도 같이 넣어야 합니다.
+// 넣지 않으면 그 문서 쓰기가 통째로 거부되는데, 화면에는 아무 말도 뜨지 않고
+// 전광판에서 모둠이 사라지는 것으로만 나타나 원인을 찾기 어렵습니다.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() {
-      return request.auth != null;
+    // ------------------------------------------------ 햄스터봇 미로 탈출
+    match /mazeRooms/{room} {
+      allow read: if room.size() <= 40;
+
+      allow create, update: if room.size() <= 40
+        && request.resource.data.keys().hasOnly(['seed', 'size', 'round', 'startedAt', 'updatedAt'])
+        && request.resource.data.seed is int
+        && request.resource.data.seed >= 0
+        && request.resource.data.round is int
+        && request.resource.data.round >= 0
+        && request.resource.data.round < 10000
+        && request.resource.data.size is int
+        && request.resource.data.size >= 5
+        && request.resource.data.size <= 15;
+
+      allow delete: if false;
+
+      match /groups/{gid} {
+        allow read: if true;
+
+        // mode·tries·planLen 은 설계 모드에서 올리는 값입니다.
+        // 어느 모둠이 몇 번 고쳐서 성공했는지 나중에 들여다보려고 담습니다.
+        allow create, update: if gid.matches('^([1-9]|1[0-9]|2[0-9]|3[0-9])$')
+          && request.resource.data.keys().hasOnly(
+               ['group', 'name', 'c', 'r', 'dir', 'moves', 'state', 'robot',
+                'round', 'finishedAt', 'updatedAt',
+                'mode', 'tries', 'planLen'])
+          && request.resource.data.group is int
+          && request.resource.data.name is string
+          && request.resource.data.name.size() <= 20
+          && request.resource.data.c is int
+          && request.resource.data.c >= 0 && request.resource.data.c < 100
+          && request.resource.data.r is int
+          && request.resource.data.r >= 0 && request.resource.data.r < 100
+          && request.resource.data.dir is int
+          && request.resource.data.dir >= 0 && request.resource.data.dir < 4
+          && request.resource.data.moves is int
+          && request.resource.data.moves >= 0
+          && request.resource.data.state in ['waiting', 'playing', 'done']
+          && request.resource.data.robot is bool
+          && request.resource.data.round is int;
+
+        allow delete: if true;
+      }
     }
 
-    // 학생들이 보낸 캐릭터.
+    // ---------------------------------------------------- 수학 미로 대결
     //
-    //  - 그림은 보낸 사람의 uid 를 함께 적어 둡니다.
-    //  - 한 번 보낸 그림은 고칠 수 없습니다(update 금지). 장난으로 남의
-    //    그림을 바꿔치기하는 일을 막습니다.
-    //  - 지우기는 선생님 화면의 "새 퍼레이드 시작" 버튼이 씁니다. 이 버튼은
-    //    선생님 화면에만 있지만, 로그인이 없으므로 규칙만으로는 누른 사람을
-    //    가릴 수 없습니다. 발표회가 끝나면 아래 create 를 잠시 막아 두거나,
-    //    수업용으로만 쓰는 주소를 공유하세요.
-    match /pd_characters/{id} {
-      allow read: if isSignedIn();
+    // 한 모둠이 컴퓨터 두 대를 씁니다. a 가 심판 자리(가 학생), b 가 운전
+    // 자리(나 학생)입니다. 두 화면이 같은 모둠 문서를 함께 고칩니다.
+    //
+    // 점수와 라운드는 심판 자리가 트랜잭션으로 올립니다. 같은 라운드를 두 번
+    // 세지 않으려고 화면 쪽에서 지금 라운드를 확인한 뒤에 올리는데, 규칙에서도
+    // 라운드가 뒤로 가지 않는 것과 점수가 한 번에 한 점만 오르는 것을 봅니다.
+    match /mathRooms/{room} {
+      allow read: if room.size() <= 40;
 
-      allow create: if isSignedIn()
+      allow create, update: if room.size() <= 40
+        && request.resource.data.keys().hasOnly(
+             ['seed', 'era', 'startedAt', 'roundCount', 'groupCount', 'updatedAt'])
+        && request.resource.data.seed is int
+        && request.resource.data.seed >= 0
+        && request.resource.data.era is int
+        && request.resource.data.era >= 0
+        && request.resource.data.era < 10000
+        && request.resource.data.roundCount is int
+        && request.resource.data.roundCount >= 1
+        && request.resource.data.roundCount <= 20
+        && request.resource.data.groupCount is int
+        && request.resource.data.groupCount >= 1
+        && request.resource.data.groupCount <= 40;
+
+      allow delete: if false;
+
+      match /groups/{gid} {
+        allow read: if true;
+
+        allow create, update: if gid.matches('^([1-9]|1[0-9]|2[0-9]|3[0-9])$')
+          && request.resource.data.keys().hasOnly(
+               ['group', 'name', 'a', 'b', 'round', 'scoreA', 'scoreB',
+                'log', 'era', 'updatedAt'])
+          && request.resource.data.group is int
+          && request.resource.data.name is string
+          && request.resource.data.name.size() <= 20
+          && request.resource.data.a is map
+          && request.resource.data.b is map
+          && request.resource.data.round is int
+          && request.resource.data.round >= 0
+          && request.resource.data.round <= 20
+          && request.resource.data.scoreA is int
+          && request.resource.data.scoreA >= 0
+          && request.resource.data.scoreA <= 20
+          && request.resource.data.scoreB is int
+          && request.resource.data.scoreB >= 0
+          && request.resource.data.scoreB <= 20
+          && request.resource.data.era is int
+          && request.resource.data.log is list
+          && request.resource.data.log.size() <= 20
+          // 이미 있는 문서를 고치는 경우에는 라운드가 뒤로 가지 못하게 합니다.
+          // 늦게 도착한 옛 보고가 점수를 되돌리는 일을 막습니다.
+          && (
+               !exists(/databases/$(database)/documents/mathRooms/$(room)/groups/$(gid))
+               || request.resource.data.era != resource.data.era
+               || (
+                    request.resource.data.round >= resource.data.round
+                    && request.resource.data.scoreA >= resource.data.scoreA
+                    && request.resource.data.scoreB >= resource.data.scoreB
+                  )
+             );
+
+        allow delete: if true;
+      }
+    }
+
+    // ------------------------------------------- 우리 반 캐릭터 퍼레이드
+    // (parade 저장소의 규칙을 그대로 옮겼습니다. 익명 로그인으로 들어옵니다.)
+    //  - 한 번 보낸 그림은 고칠 수 없습니다(남의 그림 바꿔치기 막기).
+    //  - 지우기는 선생님 화면의 "새 퍼레이드 시작" 버튼이 씁니다.
+    match /pd_characters/{id} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.name is string
         && request.resource.data.name.size() <= 12
@@ -48,10 +160,10 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uid', 'name', 'img', 'at']);
 
       allow update: if false;
-      allow delete: if isSignedIn();
+      allow delete: if request.auth != null;
     }
 
-    // 그 밖의 모든 경로는 막는다.
+    // 그 밖의 모든 경로는 잠급니다.
     match /{document=**} {
       allow read, write: if false;
     }
