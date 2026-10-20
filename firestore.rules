@@ -157,7 +157,14 @@ service cloud.firestore {
         && request.resource.data.img.size() < 300000
         && request.resource.data.img.matches('data:image/png;base64,.*')
         && request.resource.data.at is number
-        && request.resource.data.keys().hasOnly(['uid', 'name', 'img', 'at']);
+        // 학생 로그인 화면에서 고른 학년·반·번호
+        && request.resource.data.grade is int
+        && request.resource.data.grade >= 1 && request.resource.data.grade <= 6
+        && request.resource.data.cls is int
+        && request.resource.data.cls >= 1 && request.resource.data.cls <= 15
+        && request.resource.data.num is int
+        && request.resource.data.num >= 1 && request.resource.data.num <= 40
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'img', 'at', 'grade', 'cls', 'num']);
 
       allow update: if false;
       allow delete: if request.auth != null;

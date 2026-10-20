@@ -63,6 +63,39 @@ button:disabled { opacity:.45; cursor:not-allowed; transform:none; }
   border-radius:14px; padding:12px 16px; font-size:.84em; line-height:1.65; text-align:left;
 }
 
+/* ===================== 학생 로그인 화면 ===================== */
+#loginScreen {
+  height:100%; overflow-y:auto;
+  display:flex; align-items:center; justify-content:center; padding:24px 16px;
+}
+.login-box {
+  width:100%; max-width:420px; text-align:center;
+  background:rgba(255,255,255,.16); backdrop-filter:blur(8px);
+  border:2px solid rgba(255,255,255,.3); border-radius:22px;
+  padding:24px 20px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+}
+.login-box h2 { font-size:1.5em; }
+.login-box .sub { opacity:.9; margin:6px 0 18px; font-size:.9em; }
+.login-row { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px; }
+.login-row label { display:flex; flex-direction:column; gap:5px; font-size:.85em; font-weight:700; }
+.login-row select, #loginName {
+  width:100%; padding:11px 8px; border:none; border-radius:12px;
+  font-size:1em; font-family:inherit; color:#333; background:#fff;
+}
+#loginName { padding:11px 14px; margin-bottom:12px; }
+#loginBtn {
+  width:100%; background:linear-gradient(45deg,#4CAF50,#2e7d32); color:#fff;
+  border-radius:26px; padding:14px; font-size:1.1em; box-shadow:0 6px 18px rgba(0,0,0,.3);
+}
+#loginMsg { margin:10px 0 12px; min-height:1.4em; font-size:.9em; line-height:1.5; }
+
+.who {
+  display:flex; align-items:center; gap:8px;
+  background:rgba(0,0,0,.22); border-radius:14px; padding:8px 12px; font-size:.88em;
+}
+.who span { flex:1; font-weight:700; }
+#switchBtn { background:rgba(255,255,255,.9); color:#333; border-radius:16px; padding:6px 12px; font-size:.9em; }
+
 /* ===================== 학생 화면 ===================== */
 #studentScreen { height:100%; overflow-y:auto; padding:14px 14px 30px; }
 .s-wrap { max-width:520px; margin:0 auto; display:flex; flex-direction:column; gap:12px; }
@@ -240,12 +273,33 @@ button:disabled { opacity:.45; cursor:not-allowed; transform:none; }
   </div>
 </div>
 
+<!-- ===================== 학생 로그인 ===================== -->
+<div id="loginScreen" hidden>
+  <div class="login-box">
+    <h2>🎨 학생 로그인</h2>
+    <p class="sub">학년, 반, 번호를 고르고 이름을 써 주세요.</p>
+    <div class="login-row">
+      <label>학년<select id="gradeSel"></select></label>
+      <label>반<select id="classSel"></select></label>
+      <label>번호<select id="numSel"></select></label>
+    </div>
+    <input type="text" id="loginName" maxlength="12" autocomplete="off" placeholder="이름">
+    <button id="loginBtn">들어가기</button>
+    <p id="loginMsg"></p>
+    <button class="backBtn" data-back>← 처음으로</button>
+  </div>
+</div>
+
 <!-- ===================== 학생 화면 ===================== -->
 <div id="studentScreen" hidden>
   <div class="s-wrap">
     <div class="s-head">
       <h2>🎨 내 캐릭터 그리기</h2>
       <button class="backBtn" data-back>← 처음으로</button>
+    </div>
+    <div class="who">
+      <span id="whoText"></span>
+      <button id="switchBtn">바꾸기</button>
     </div>
 
     <div class="panel">
@@ -380,7 +434,7 @@ function showBootError(err){
 /* ------------------------------------------------------------------
    화면 전환
 ------------------------------------------------------------------ */
-const screens = { role:$("roleScreen"), student:$("studentScreen"), teacher:$("teacherScreen") };
+const screens = { role:$("roleScreen"), login:$("loginScreen"), student:$("studentScreen"), teacher:$("teacherScreen") };
 
 function show(which){
   Object.keys(screens).forEach((k) => { screens[k].hidden = (k !== which); });
@@ -425,8 +479,88 @@ document.querySelectorAll("[data-back]").forEach((b) => {
   });
 })();
 
-$("goStudent").addEventListener("click", async () => {
-  try { await connect(); show("student"); } catch (e) { showBootError(e); }
+/* ------------------------------------------------------------------
+   학생 로그인 — 학년·반·번호·이름.
+
+   계정이 있는 진짜 로그인이 아니라 학생이 스스로 고르는 값이다. 선생님
+   무대에서 누가 보냈는지 알아보는 데 쓴다. 한 번 넣으면 그 기기에 기억해
+   두어, 다음에 들어올 때는 고른 값이 미리 채워져 있다.
+------------------------------------------------------------------ */
+const GRADES  = 6;     // 학년 1~6
+const CLASSES = 15;    // 반 1~15
+const NUMBERS = 40;    // 번호 1~40
+const STUDENT_KEY = "pd_student";
+
+let student = null;    // { grade, cls, num, name }
+
+function fillSelect(sel, max, unit){
+  sel.innerHTML = '<option value="">선택</option>';
+  for (let i = 1; i <= max; i++){
+    const o = document.createElement("option");
+    o.value = String(i);
+    o.textContent = i + unit;
+    sel.appendChild(o);
+  }
+}
+fillSelect($("gradeSel"), GRADES,  "학년");
+fillSelect($("classSel"), CLASSES, "반");
+fillSelect($("numSel"),   NUMBERS, "번");
+
+function studentLabel(s){
+  return s.grade + "학년 " + s.cls + "반 " + s.num + "번";
+}
+
+function openLogin(){
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(STUDENT_KEY) || "null"); }
+  catch (e) {}
+  if (saved){
+    $("gradeSel").value = String(saved.grade || "");
+    $("classSel").value = String(saved.cls   || "");
+    $("numSel").value   = String(saved.num   || "");
+    $("loginName").value = saved.name || "";
+  }
+  $("loginMsg").textContent = "";
+  show("login");
+}
+
+$("goStudent").addEventListener("click", openLogin);
+$("switchBtn").addEventListener("click", openLogin);
+
+$("loginBtn").addEventListener("click", async () => {
+  const msg  = $("loginMsg");
+  const grade = Number($("gradeSel").value);
+  const cls   = Number($("classSel").value);
+  const num   = Number($("numSel").value);
+  const name  = $("loginName").value.trim().slice(0, 12);
+
+  if (!grade || !cls || !num){ msg.textContent = "학년, 반, 번호를 모두 골라 주세요."; return; }
+  if (!name){ msg.textContent = "이름을 써 주세요."; $("loginName").focus(); return; }
+  if (badWordIn(name)){ msg.textContent = BAD_MSG; $("loginName").focus(); return; }
+
+  const btn = $("loginBtn");
+  btn.disabled = true;
+  msg.textContent = "연결하는 중...";
+  try {
+    await connect();
+    student = { grade, cls, num, name };
+    try { localStorage.setItem(STUDENT_KEY, JSON.stringify(student)); } catch (e) {}
+
+    $("whoText").textContent = "🙋 " + studentLabel(student) + " " + name;
+    $("nameInput").value = name;          // 이름표는 로그인한 이름으로 시작한다
+    $("nameInput").dispatchEvent(new Event("input"));
+    msg.textContent = "";
+    show("student");
+  } catch (e){
+    msg.textContent = "";
+    showBootError(e);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("loginName").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("loginBtn").click();
 });
 /* 선생님 화면은 확인 번호를 맞혀야 열린다. 발표회 도중 새로고침해도 다시
    묻지 않도록, 한 번 맞힌 기기에는 표시를 남겨 둔다. */
@@ -780,6 +914,8 @@ $("nameInput").addEventListener("input", () => {
 $("sendBtn").addEventListener("click", async () => {
   const btn = $("sendBtn"), msg = $("sendMsg");
 
+  if (!student){ openLogin(); return; }
+
   const name = $("nameInput").value.trim().slice(0, 12);
   if (badWordIn(name)){
     msg.textContent = BAD_MSG;
@@ -797,10 +933,13 @@ $("sendBtn").addEventListener("click", async () => {
   msg.textContent = "보내는 중...";
   try {
     await addDoc(collection(db, COL), {
-      name: name,
-      img:  img,
-      uid:  uid,
-      at:   Date.now()
+      name:  name,
+      img:   img,
+      uid:   uid,
+      grade: student.grade,
+      cls:   student.cls,
+      num:   student.num,
+      at:    Date.now()
     });
     msg.textContent = "🎉 보냈어요! 큰 화면을 보세요. 또 그려도 좋아요.";
     clearCanvas();
@@ -956,10 +1095,12 @@ function spawnMarcher(c){
   img.alt = "";
   el.appendChild(img);
 
-  if (c.name){
+  /* 이름표가 비어 있으면 학년·반·번호로 대신 보여 준다. */
+  const label = c.name || (c.grade ? studentLabel(c) : "");
+  if (label){
     const tag = document.createElement("div");
     tag.className = "tag";
-    tag.textContent = c.name;
+    tag.textContent = label;
     el.appendChild(tag);
   }
   stage.appendChild(el);
