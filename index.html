@@ -169,6 +169,9 @@ button:disabled { opacity:.45; cursor:not-allowed; transform:none; }
 #countBadge { background:rgba(255,255,255,.2); border-radius:20px; padding:6px 14px; font-size:.86em; font-weight:700; }
 .t-bar button { border-radius:20px; padding:8px 15px; font-size:.84em; }
 #musicBtn { background:#ffd54f; color:#333; }
+#nextSongBtn { background:#ffe082; color:#333; }
+#nextSongBtn[hidden] { display:none; }
+#songLabel { font-size:.86em; font-weight:700; }
 #resetBtn { background:#ef5350; color:#fff; }
 #tBackBtn { background:rgba(255,255,255,.25); color:#fff; }
 
@@ -335,6 +338,8 @@ button:disabled { opacity:.45; cursor:not-allowed; transform:none; }
     <h2>🎬 우리 반 캐릭터 퍼레이드</h2>
     <span id="countBadge">참가 캐릭터 0</span>
     <button id="musicBtn">🎵 음악 시작</button>
+    <button id="nextSongBtn" hidden>⏭️ 다음 곡</button>
+    <span id="songLabel"></span>
     <button id="resetBtn">🔄 새 퍼레이드 시작</button>
     <button id="tBackBtn" data-back>← 처음으로</button>
   </div>
@@ -1252,23 +1257,132 @@ $("resetBtn").addEventListener("click", async () => {
 });
 
 /* ------------------------------------------------------------------
-   행진곡 — 금관 멜로디 + 베이스 + 드럼 + 심벌 크래시, 132BPM
+   신나는 음악 — 곡 다섯 개를 돌아가며 튼다.
+   한 곡을 SONG_BARS 마디 동안 틀고 다음 곡으로 넘어간다.
+   "다음 곡" 버튼을 누르면 바로 넘어간다.
+
+   곡 하나는 아래 모양의 자료다. 모든 곡을 같은 악기들이 연주하고,
+   곡이 바뀔 때 빠르기와 멜로디 음색만 바꾼다.
+     melody : 8분음표마다 한 음 (null 은 쉼표), 4마디 = 32칸
+     bass   : 8분음표마다 한 음, 4마디 = 32칸
+     chords : 마디마다 화음 하나 (stab 박자에 맞춰 짧게 친다)
+     kick·snare·hat·stab : 한 마디를 16칸(16분음표)으로 나눈 리듬, x 가 치는 자리
 ------------------------------------------------------------------ */
-const MELODY = [
-  "C5","E5","G5","C6","G5","E5","C5","G4",
-  "C5","D5","E5","G5","E5","D5","C5","B4",
-  "C5","E5","G5","C6","G5","E5","C5","G4",
-  "G5","F5","E5","D5","C5","D5","E5","C5"
+const SONG_BARS = 16;
+
+const SONGS = [
+  {
+    name: "행진곡", bpm: 132, lead: "sawtooth",
+    melody: [
+      "C5","E5","G5","C6","G5","E5","C5","G4",
+      "C5","D5","E5","G5","E5","D5","C5","B4",
+      "C5","E5","G5","C6","G5","E5","C5","G4",
+      "G5","F5","E5","D5","C5","D5","E5","C5"
+    ],
+    bass: [
+      "C3",null,"G3",null,"C3",null,"G3",null,
+      "G2",null,"D3",null,"G2",null,"D3",null,
+      "C3",null,"G3",null,"C3",null,"G3",null,
+      "G2",null,"G2",null,"C3",null,"C3",null
+    ],
+    chords: [["C4","E4","G4"],["B3","D4","G4"],["C4","E4","G4"],["B3","D4","G4"]],
+    kick:  "x.......x.......",
+    snare: "....x.......x.x.",
+    hat:   "",
+    stab:  ""
+  },
+  {
+    name: "폴카 춤곡", bpm: 152, lead: "square",
+    melody: [
+      "A4","C5","F5","C5","A4","C5","F5","A5",
+      "G5","F5","E5","F5","G5",null,"C5",null,
+      "Bb4","D5","F5","D5","Bb4","D5","F5","Bb5",
+      "A5","G5","F5","E5","F5",null,"F5",null
+    ],
+    bass: [
+      "F2",null,"C3",null,"F2",null,"C3",null,
+      "C3",null,"G2",null,"C3",null,"G2",null,
+      "Bb2",null,"F2",null,"Bb2",null,"F2",null,
+      "C3",null,"C3",null,"F2",null,"F2",null
+    ],
+    chords: [["A3","C4","F4"],["G3","C4","E4"],["Bb3","D4","F4"],["A3","C4","F4"]],
+    kick:  "x...x...x...x...",
+    snare: "..x...x...x...x.",
+    hat:   "",
+    stab:  "..x...x...x...x."
+  },
+  {
+    name: "디스코 파티", bpm: 120, lead: "square",
+    melody: [
+      "E5",null,"E5","D5","E5",null,"C5","A4",
+      null,"A4","C5","F5","E5","D5","C5",null,
+      "G4","C5","E5","G5",null,"G5","E5","C5",
+      "D5",null,"D5","E5","D5","B4","G4",null
+    ],
+    bass: [
+      "A2","A3","A2","A3","A2","A3","A2","A3",
+      "F2","F3","F2","F3","F2","F3","F2","F3",
+      "C3","C4","C3","C4","C3","C4","C3","C4",
+      "G2","G3","G2","G3","G2","G3","G2","G3"
+    ],
+    chords: [["A3","C4","E4"],["A3","C4","F4"],["G3","C4","E4"],["G3","B3","D4"]],
+    kick:  "x...x...x...x...",
+    snare: "....x.......x...",
+    hat:   "..x...x...x...x.",
+    stab:  "...x..x....x..x."
+  },
+  {
+    name: "게임 모험", bpm: 160, lead: "square",
+    melody: [
+      "C5","E5","G5","C6","G5","E5","C5","E5",
+      "B4","D5","G5","B5","G5","D5","B4","D5",
+      "A4","C5","E5","A5","E5","C5","A4","C5",
+      "F5",null,"F5","G5","A5",null,"G5",null
+    ],
+    bass: [
+      "C3","C3","C3","C3","C3","C3","G2","G2",
+      "G2","G2","G2","G2","G2","G2","D3","D3",
+      "A2","A2","A2","A2","A2","A2","E3","E3",
+      "F2","F2","F2","F2","G2","G2","G2","G2"
+    ],
+    chords: [],
+    kick:  "x.......x.x.....",
+    snare: "....x.......x...",
+    hat:   "x.x.x.x.x.x.x.x.",
+    stab:  ""
+  },
+  {
+    name: "바닷가 축제", bpm: 124, lead: "triangle",
+    melody: [
+      "B4","D5",null,"B4","D5",null,"G5",null,
+      "E5",null,"E5","G5","E5","C5",null,null,
+      "D5","F#5","A5",null,"F#5","D5","A4",null,
+      "G5",null,"D5","B4","G4",null,null,null
+    ],
+    bass: [
+      "G2",null,null,"G2","D3",null,"D3",null,
+      "C3",null,null,"C3","G2",null,"G2",null,
+      "D3",null,null,"D3","A2",null,"A2",null,
+      "G2",null,null,"G2","D3",null,"G2",null
+    ],
+    chords: [["G3","B3","D4"],["G3","C4","E4"],["F#3","A3","D4"],["G3","B3","D4"]],
+    kick:  "x.....x.x.....x.",
+    snare: "....x.......x...",
+    hat:   "x.x.x.x.x.x.x.x.",
+    stab:  "..x...x...x...x."
+  }
 ];
-const BASS = ["C3","G3","C3","G3","C3","G3","C3","G3"];
 
 let musicOn   = false;
 let musicBusy = false;   // 시작과 정지가 겹쳐 악단이 둘로 늘어나는 것을 막는다
 let musicNodes = [];     // 이번에 만든 악기와 반복 재생을 하나도 빠짐없이 모아 둔다
+let skipSong  = false;   // "다음 곡" 버튼을 눌렀는지
 
 /* 만든 것을 모두 여기 담아 두어야 정지할 때 전부 끌 수 있다.
    담아 두지 않은 악기는 참조를 잃어 다시는 멈출 수 없다. */
 function keep(node){ musicNodes.push(node); return node; }
+
+function hits(pattern, i){ return pattern.charAt(i) === "x"; }
 
 async function startMusic(){
   await Tone.start();
@@ -1277,13 +1391,19 @@ async function startMusic(){
     oscillator:{ type:"sawtooth" },
     envelope:{ attack:0.01, decay:0.15, sustain:0.35, release:0.25 }
   }).toDestination());
-  lead.volume.value = -6;
+  lead.volume.value = -8;
+
+  const stab = keep(new Tone.PolySynth(Tone.Synth, {
+    oscillator:{ type:"square" },
+    envelope:{ attack:0.005, decay:0.08, sustain:0, release:0.05 }
+  }).toDestination());
+  stab.volume.value = -20;
 
   const bass = keep(new Tone.Synth({
     oscillator:{ type:"triangle" },
     envelope:{ attack:0.01, decay:0.2, sustain:0.2, release:0.15 }
   }).toDestination());
-  bass.volume.value = -7;
+  bass.volume.value = -5;
 
   const kick = keep(new Tone.MembraneSynth({
     octaves:4, envelope:{ attack:0.001, decay:0.3, sustain:0 }
@@ -1293,7 +1413,13 @@ async function startMusic(){
   const snare = keep(new Tone.NoiseSynth({
     noise:{ type:"white" }, envelope:{ attack:0.001, decay:0.12, sustain:0 }
   }).toDestination());
-  snare.volume.value = -11;
+  snare.volume.value = -12;
+
+  const hat = keep(new Tone.MetalSynth({
+    envelope:{ attack:0.001, decay:0.05, release:0.01 },
+    harmonicity:5.1, resonance:6000, octaves:1
+  }).toDestination());
+  hat.volume.value = -30;
 
   const cymbal = keep(new Tone.MetalSynth({
     envelope:{ attack:0.001, decay:0.6, release:0.2 },
@@ -1301,27 +1427,54 @@ async function startMusic(){
   }).toDestination());
   cymbal.volume.value = -18;
 
-  let step = 0, beat = 0;
-  Tone.Transport.bpm.value = 132;
+  let songIdx = Math.floor(Math.random() * SONGS.length);
+  let step = 0;       // 지금 곡 안에서 몇 번째 16분음표인지
+
+  function useSong(i, time){
+    songIdx = i;
+    step = 0;
+    const song = SONGS[i];
+    Tone.Transport.bpm.setValueAtTime(song.bpm, time);
+    lead.set({ oscillator:{ type: song.lead } });
+    Tone.Draw.schedule(() => {
+      $("songLabel").textContent = "🎶 " + song.name;
+    }, time);
+  }
+
+  useSong(songIdx, Tone.now());
 
   keep(new Tone.Loop((time) => {
-    lead.triggerAttackRelease(MELODY[step % MELODY.length], "16n", time);
+    // 곡을 다 틀었거나 "다음 곡"을 누르면 마디 처음에서 다음 곡으로 넘어간다
+    if (skipSong || step >= SONG_BARS * 16){
+      skipSong = false;
+      useSong((songIdx + 1) % SONGS.length, time);
+    }
+
+    const song = SONGS[songIdx];
+    const bar  = Math.floor(step / 16);
+    const i16  = step % 16;
+
+    if (step % 2 === 0){
+      const e = (step / 2) % song.melody.length;
+      if (song.melody[e]) lead.triggerAttackRelease(song.melody[e], "16n", time);
+      if (song.bass[e])   bass.triggerAttackRelease(song.bass[e],   "8n",  time);
+    }
+
+    if (hits(song.kick,  i16)) kick.triggerAttackRelease("C1", "8n", time);
+    if (hits(song.snare, i16)) snare.triggerAttackRelease("16n", time);
+    if (hits(song.hat,   i16)) hat.triggerAttackRelease("32n", time);
+    if (song.chords.length && hits(song.stab, i16)){
+      stab.triggerAttackRelease(song.chords[bar % song.chords.length], "16n", time);
+    }
+
+    // 곡이 시작할 때와 네 마디마다 심벌로 신나는 포인트를 준다
+    if (i16 === 0 && bar % 4 === 0) cymbal.triggerAttackRelease("8n", time);
+
     step++;
-  }, "8n").start(0));
-
-  keep(new Tone.Loop((time) => {
-    bass.triggerAttackRelease(BASS[beat % BASS.length], "8n", time);
-    if (beat % 2 === 0) kick.triggerAttackRelease("C1", "8n", time);
-    else                snare.triggerAttackRelease("16n", time);
-    beat++;
-  }, "4n").start(0));
-
-  /* 두 마디마다 심벌로 신나는 포인트를 준다 */
-  keep(new Tone.Loop((time) => {
-    cymbal.triggerAttackRelease("8n", time);
-  }, "2m").start(0));
+  }, "16n").start(0));
 
   Tone.Transport.start();
+  $("nextSongBtn").hidden = false;
 }
 
 /* musicOn 을 따지지 않고, 만들어 둔 것을 무조건 모두 끈다.
@@ -1333,8 +1486,15 @@ function stopMusic(){
   musicNodes.forEach((n) => { try { n.dispose(); } catch (e) {} });
   musicNodes = [];
   musicOn = false;
+  skipSong = false;
   $("musicBtn").textContent = "🎵 음악 시작";
+  $("nextSongBtn").hidden = true;
+  $("songLabel").textContent = "";
 }
+
+$("nextSongBtn").addEventListener("click", () => {
+  if (musicOn) skipSong = true;
+});
 
 $("musicBtn").addEventListener("click", async () => {
   if (musicBusy) return;          // 연달아 누르는 동안에는 받지 않는다
